@@ -34,16 +34,12 @@ partial class Bravo
     /// </summary>
     public new Bravo CopyFrom(Bravo source)
     {
-        if (ReferenceEquals(null, source)) return this;
+        if (ReferenceEquals(null, source)) throw new ArgumentNullException();
         if (ReferenceEquals(this, source)) return this;
         BeforeCopyFrom(source);
         var source_NonNullableString = source.NonNullableString;
-        if (!ReferenceEquals(null, source_NonNullableString)) {
-            CopyFromTransform_NonNullableString(ref source_NonNullableString);
-            if (!ReferenceEquals(null, source_NonNullableString)) {
-                this.NonNullableString = source_NonNullableString;
-            }
-        }
+        CopyFromTransform_NonNullableString(ref source_NonNullableString);
+        this.NonNullableString = source_NonNullableString;
         var source_NullableString = source.NullableString;
         CopyFromTransform_NullableString(ref source_NullableString);
         this.NullableString = source_NullableString;

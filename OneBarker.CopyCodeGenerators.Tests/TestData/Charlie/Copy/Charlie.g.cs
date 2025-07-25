@@ -29,7 +29,7 @@ partial class Charlie
     /// </summary>
     public new Charlie CopyFrom(Namespace2.Charlie source)
     {
-        if (ReferenceEquals(null, source)) return this;
+        if (ReferenceEquals(null, source)) throw new ArgumentNullException();
         if (ReferenceEquals(this, source)) return this;
         BeforeCopyFrom(source);
         var source_Alpha = source.Alpha;

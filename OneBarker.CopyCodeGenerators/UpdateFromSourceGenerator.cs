@@ -24,7 +24,7 @@ namespace " + Namespace + @"
     /// <summary>
     /// Generates an UpdateFrom method taking the provided TypeToCopy as an argument. 
     /// </summary>
-    [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = true)]
+    [System.AttributeUsage(System.AttributeTargets.Class | System.AttributeTargets.Struct, AllowMultiple = true)]
     internal class " + AttributeName + @" : Attribute
     {
         public Type TypeToCopy { get; }
@@ -51,7 +51,7 @@ namespace " + Namespace + @"
             // Filter classes annotated with the attribute. Only filtered Syntax Nodes can trigger code generation.
             var provider = context.SyntaxProvider
                                   .CreateSyntaxProvider(
-                                      (s,   _) => s is ClassDeclarationSyntax,
+                                      (s,   _) => s is ClassDeclarationSyntax || s is StructDeclarationSyntax,
                                       (ctx, _) => ctx.GetCopyClassDeclarationSetForSourceGen(FullAttributeName)
                                   )
                                   .Where(t => t.AttributeFound)

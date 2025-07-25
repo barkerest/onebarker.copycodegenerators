@@ -24,7 +24,7 @@ partial class Charlie
     /// </summary>
     public Charlie(Namespace2.Charlie source)
     {
-        if (ReferenceEquals(null, source)) return;
+        if (ReferenceEquals(null, source)) throw new ArgumentNullException();
         var source_Alpha = source.Alpha;
         ConstructTransform_Alpha(ref source_Alpha);
         this.Alpha = source_Alpha;

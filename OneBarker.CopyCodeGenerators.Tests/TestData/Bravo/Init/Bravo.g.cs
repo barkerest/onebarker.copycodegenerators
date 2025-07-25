@@ -29,14 +29,10 @@ partial class Bravo
     /// </summary>
     public Bravo(Bravo source) : this()
     {
-        if (ReferenceEquals(null, source)) return;
+        if (ReferenceEquals(null, source)) throw new ArgumentNullException();
         var source_NonNullableString = source.NonNullableString;
-        if (!ReferenceEquals(null, source_NonNullableString)) {
-            ConstructTransform_NonNullableString(ref source_NonNullableString);
-            if (!ReferenceEquals(null, source_NonNullableString)) {
-                this.NonNullableString = source_NonNullableString;
-            }
-        }
+        ConstructTransform_NonNullableString(ref source_NonNullableString);
+        this.NonNullableString = source_NonNullableString;
         var source_NullableString = source.NullableString;
         ConstructTransform_NullableString(ref source_NullableString);
         this.NullableString = source_NullableString;

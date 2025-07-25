@@ -34,18 +34,16 @@ partial class Bravo
     /// </summary>
     public new int UpdateFrom(Bravo source)
     {
-        if (ReferenceEquals(null, source)) return 0;
+        if (ReferenceEquals(null, source)) throw new ArgumentNullException();
         if (ReferenceEquals(this, source)) return 0;
         var changeCount = 0;
         BeforeUpdateFrom(source, ref changeCount);
         var this_NonNullableString = this.NonNullableString;
         var source_NonNullableString = source.NonNullableString;
-        if (!ReferenceEquals(null, source_NonNullableString)) {
-            UpdateFromTransform_NonNullableString(ref source_NonNullableString);
-            if (!ReferenceEquals(this_NonNullableString, source_NonNullableString) && !ReferenceEquals(null, source_NonNullableString) && (ReferenceEquals(null, this_NonNullableString) || !this_NonNullableString.Equals(source_NonNullableString))) {
-                this.NonNullableString = source_NonNullableString;
-                changeCount++;
-            }
+        UpdateFromTransform_NonNullableString(ref source_NonNullableString);
+        if (!ReferenceEquals(this_NonNullableString, source_NonNullableString) && (ReferenceEquals(null, this_NonNullableString) || !this_NonNullableString.Equals(source_NonNullableString))) {
+            this.NonNullableString = source_NonNullableString;
+            changeCount++;
         }
         var this_NullableString = this.NullableString;
         var source_NullableString = source.NullableString;

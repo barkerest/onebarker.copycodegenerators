@@ -29,7 +29,7 @@ partial class Charlie
     /// </summary>
     public new int UpdateFrom(Namespace2.Charlie source)
     {
-        if (ReferenceEquals(null, source)) return 0;
+        if (ReferenceEquals(null, source)) throw new ArgumentNullException();
         if (ReferenceEquals(this, source)) return 0;
         var changeCount = 0;
         BeforeUpdateFrom(source, ref changeCount);

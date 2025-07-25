@@ -24,7 +24,7 @@ partial class Alpha
     /// </summary>
     public Alpha(Alpha source) : this()
     {
-        if (ReferenceEquals(null, source)) return;
+        if (ReferenceEquals(null, source)) throw new ArgumentNullException();
         var source_Value = source.Value;
         ConstructTransform_Value(ref source_Value);
         this.Value = source_Value;

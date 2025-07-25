@@ -29,7 +29,7 @@ partial class Alpha
     /// </summary>
     public new Alpha CopyFrom(Alpha source)
     {
-        if (ReferenceEquals(null, source)) return this;
+        if (ReferenceEquals(null, source)) throw new ArgumentNullException();
         if (ReferenceEquals(this, source)) return this;
         BeforeCopyFrom(source);
         var source_Value = source.Value;

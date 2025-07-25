@@ -114,7 +114,7 @@ namespace OneBarker.CopyCodeGenerators
                 {
                     symProps = symProps.Where(x => x.SetMethod != null && x.SetMethod.IsInitOnly != true);
                 }
-                
+
                 symProps = symProps.Where(x =>
                     !x.GetAttributes()
                       .Any(y => SkipPropertySourceGenerator.IsAttribute(y.AttributeClass))
@@ -227,7 +227,15 @@ namespace OneBarker.CopyCodeGenerators
                 var classSymbol = classDeclarationSet.symbol;
                 var methods     = new List<string>();
                 var className   = classDeclarationSet.set.TargetClass.Identifier.Text;
-                var classType   = classDeclarationSet.set.TargetClass is RecordDeclarationSyntax ? "record" : "class";
+                var classType =
+                    classDeclarationSet.set.TargetClass is StructDeclarationSyntax
+                        ? "struct"
+                        : classDeclarationSet.set.TargetClass is RecordDeclarationSyntax r
+                            ? (!string.IsNullOrEmpty(r.ClassOrStructKeyword.Text) &&
+                               r.ClassOrStructKeyword.Text != "class"
+                                   ? "record " + r.ClassOrStructKeyword.Text
+                                   : "record")
+                            : "class";
 
                 // Records with parameterized constructors must have the primary constructor called.
                 // And we need to generate some passthrough handlers to make that work.
@@ -356,7 +364,7 @@ namespace OneBarker.CopyCodeGenerators
                     {
                         body.Append(
                             @"
-        if (ReferenceEquals(null, source)) return 0;
+        if (ReferenceEquals(null, source)) throw new ArgumentNullException();
         if (ReferenceEquals(this, source)) return 0;
         var changeCount = 0;"
                         );
@@ -365,7 +373,7 @@ namespace OneBarker.CopyCodeGenerators
                     {
                         body.Append(
                             @"
-        if (ReferenceEquals(null, source)) return this;
+        if (ReferenceEquals(null, source)) throw new ArgumentNullException();
         if (ReferenceEquals(this, source)) return this;"
                         );
                     }
@@ -373,7 +381,7 @@ namespace OneBarker.CopyCodeGenerators
                     {
                         body.Append(
                             @"
-        if (ReferenceEquals(null, source)) return;"
+        if (ReferenceEquals(null, source)) throw new ArgumentNullException();"
                         );
                     }
 
@@ -402,32 +410,28 @@ namespace OneBarker.CopyCodeGenerators
                     {
                         if (!transforms.ContainsKey(p.Name))
                         {
-                            if (addInitPassthroughs)
-                            {
-                                transforms[p.Name] = $@"
-    /// <summary>
-    /// Transforms the {p.Name} value before assigning the value to the target.
-    /// </summary>
-    static partial void {extraMethodNameBase}Transform_{p.Name}(ref {p.Type} value);
-    
-    /// <summary>
-    /// Transforms the {p.Name} value and returns the new value.
-    /// </summary>
-    static {p.Type} PassthroughTransform_{p.Name}({p.Type} value)
-    {{
-        {extraMethodNameBase}Transform_{p.Name}(ref value);
-        return value;
-    }}";
-                            }
-                            else
-                            {
-                                transforms[p.Name] = $@"
+                            transforms[p.Name] = $@"
     /// <summary>
     /// Transforms the {p.Name} value before assigning the value to the target.
     /// </summary>
     static partial void {extraMethodNameBase}Transform_{p.Name}(ref {p.Type} value);";
-                            }
                         }
+
+                        if (useInitPassthroughs)
+                        {
+                            transforms[$"~{p.Name}_{sourceClassName}"] = $@"
+    /// <summary>
+    /// Transforms the {p.Name} value and returns the new value.
+    /// </summary>
+    static {p.Type} PassthroughTransform_{p.Name}({sourceClassName} source)
+    {{
+        if (ReferenceEquals(null, source)) throw new ArgumentNullException();
+        var value = source.{p.Name};
+        {extraMethodNameBase}Transform_{p.Name}(ref value);
+        return value;
+    }}";
+                        }
+
 
                         // property setting for parameterized properties is handled via the passthroughs only.
                         if (useInitPassthroughs && recParamList.Contains(p.Name)) continue;
@@ -460,17 +464,16 @@ namespace OneBarker.CopyCodeGenerators
                             else if (isNotNullable)
                             {
                                 // reference types can be nullable or non-nullable.
-                                // non-nullable should not allow null to be set.
+                                // non-nullable should be treated (mostly) like value types.
+                                // we'll just throw in a null check before calling Equals()
                                 body.AppendFormat(
                                     @"
         var {2} = this.{0};
         var {1} = source.{0};
-        if (!ReferenceEquals(null, {1})) {{
-            {3}Transform_{0}(ref {1});
-            if (!ReferenceEquals({2}, {1}) && !ReferenceEquals(null, {1}) && (ReferenceEquals(null, {2}) || !{2}.Equals({1}))) {{
-                this.{0} = {1};
-                changeCount++;
-            }}
+        {3}Transform_{0}(ref {1});
+        if (!ReferenceEquals({2}, {1}) && (ReferenceEquals(null, {2}) || !{2}.Equals({1}))) {{
+            this.{0} = {1};
+            changeCount++;
         }}",
                                     p.Name,
                                     sourceName,
@@ -500,36 +503,16 @@ namespace OneBarker.CopyCodeGenerators
                         else
                         {
                             // don't check for changes, just copy the value over.
-                            if (p.Type.IsValueType || !isNotNullable)
-                            {
-                                body.AppendFormat(
-                                    @"
+                            body.AppendFormat(
+                                @"
         var {1} = source.{0};
         {3}Transform_{0}(ref {1});
         this.{0} = {1};",
-                                    p.Name,
-                                    sourceName,
-                                    targetName,
-                                    extraMethodNameBase
-                                );
-                            }
-                            else
-                            {
-                                body.AppendFormat(
-                                    @"
-        var {1} = source.{0};
-        if (!ReferenceEquals(null, {1})) {{
-            {3}Transform_{0}(ref {1});
-            if (!ReferenceEquals(null, {1})) {{
-                this.{0} = {1};
-            }}
-        }}",
-                                    p.Name,
-                                    sourceName,
-                                    targetName,
-                                    extraMethodNameBase
-                                );
-                            }
+                                p.Name,
+                                sourceName,
+                                targetName,
+                                extraMethodNameBase
+                            );
                         }
                     }
 
@@ -584,7 +567,7 @@ partial {1} {2}
                     classType,
                     className
                 );
-                
+
                 foreach (var t in transforms.OrderBy(x => x.Key))
                 {
                     code.Append(t.Value).Append('\n');

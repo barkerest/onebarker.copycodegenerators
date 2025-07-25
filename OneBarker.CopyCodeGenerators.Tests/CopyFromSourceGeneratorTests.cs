@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Testing;
@@ -11,7 +12,7 @@ using Xunit.Abstractions;
 
 namespace OneBarker.CopyCodeGenerators.Tests;
 
-public class CopyInitUpdateFromSourceGeneratorTests
+public partial class CopyInitUpdateFromSourceGeneratorTests
 {
     
     #region Test Data
@@ -119,10 +120,46 @@ public class CopyInitUpdateFromSourceGeneratorTests
            .Select(x => (MetadataReference) MetadataReference.CreateFromFile(x))
            .ToArray();
 
+    
+    [GeneratedRegex(@"^\s*/\*")]
+    private static partial Regex CommentStart();
+
+    [GeneratedRegex(@"\*/\s*$")]
+    private static partial Regex CommentEnd();
+
+    [GeneratedRegex(@"\r?\n")]
+    private static partial Regex NewLine();
+    
+    private void OutputComments(CopyTestData data)
+    {
+        var start     = CommentStart();
+        var end       = CommentEnd();
+        var dataLines = NewLine().Split(data.Source);
+        var write     = false;
+        foreach (var line in dataLines)
+        {
+            if (write)
+            {
+                _output.WriteLine(line);
+                if (end.IsMatch(line))
+                {
+                    write = false;
+                }
+            }
+            else if (start.IsMatch(line))
+            {
+                _output.WriteLine(line);
+                write = true;
+            }
+        }
+    }
+    
     [Theory]
     [MemberData(nameof(GetCopyData))]
     public void GenerateCopyFromMethod(CopyTestData data)
     {
+        OutputComments(data);
+        
         // Create an instance of the source generator.
         var generator = new CopyFromSourceGenerator();
 
@@ -155,6 +192,8 @@ public class CopyInitUpdateFromSourceGeneratorTests
     [MemberData(nameof(GetInitData))]
     public void GenerateInitFromMethod(CopyTestData data)
     {
+        OutputComments(data);
+        
         // Create an instance of the source generator.
         var generator = new InitFromSourceGenerator();
 
@@ -188,6 +227,8 @@ public class CopyInitUpdateFromSourceGeneratorTests
     [MemberData(nameof(GetUpdateData))]
     public void GenerateUpdateFromMethod(CopyTestData data)
     {
+        OutputComments(data);
+        
         // Create an instance of the source generator.
         var generator = new UpdateFromSourceGenerator();
 
@@ -216,4 +257,5 @@ public class CopyInitUpdateFromSourceGeneratorTests
         }
     }
 
+    
 }
