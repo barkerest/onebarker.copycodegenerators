@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OneBarker.CopyCodeGenerators", "OneBarker.CopyCodeGenerators\OneBarker.CopyCodeGenerators.csproj", "{D33A587F-B727-4A80-B600-03F09BE99D3F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OneBarker.CopyCodeGenerators.Samples", "OneBarker.CopyCodeGenerators.Samples\OneBarker.CopyCodeGenerators.Samples.csproj", "{B9A19F8E-C8C2-4F2C-89E6-BC4C17E3AEF0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OneBarker.CopyCodeGenerators.Tests", "OneBarker.CopyCodeGenerators.Tests\OneBarker.CopyCodeGenerators.Tests.csproj", "{F4AB8B3A-68A4-4A0A-86CA-A213A801885F}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D33A587F-B727-4A80-B600-03F09BE99D3F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D33A587F-B727-4A80-B600-03F09BE99D3F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D33A587F-B727-4A80-B600-03F09BE99D3F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D33A587F-B727-4A80-B600-03F09BE99D3F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B9A19F8E-C8C2-4F2C-89E6-BC4C17E3AEF0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B9A19F8E-C8C2-4F2C-89E6-BC4C17E3AEF0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B9A19F8E-C8C2-4F2C-89E6-BC4C17E3AEF0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B9A19F8E-C8C2-4F2C-89E6-BC4C17E3AEF0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F4AB8B3A-68A4-4A0A-86CA-A213A801885F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F4AB8B3A-68A4-4A0A-86CA-A213A801885F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F4AB8B3A-68A4-4A0A-86CA-A213A801885F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F4AB8B3A-68A4-4A0A-86CA-A213A801885F}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

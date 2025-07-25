@@ -1,0 +1,11 @@
+/**/bin
+/**/obj
+/**/tmp/*
+!/**/.keep
+/.idea
+/.vs
+/**/.idea
+/**/.vs
+/**/*.zip
+/**/*.nupkg
+node_modules
