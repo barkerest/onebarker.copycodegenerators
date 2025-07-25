@@ -1,4 +1,6 @@
-﻿using Microsoft.CodeAnalysis;
+﻿using System.Linq;
+using JetBrains.Annotations;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace OneBarker.CopyCodeGenerators
@@ -11,13 +13,29 @@ namespace OneBarker.CopyCodeGenerators
             bool                  attributeFound
         )
         {
-            TargetClass      = target;
-            SourceClassNames = sourceNames;
-            AttributeFound   = attributeFound;
+            TargetObject      = target;
+            SourceObjectNames = sourceNames;
+            AttributeFound    = attributeFound;
+            TargetObjectType = TargetObject is StructDeclarationSyntax
+                                   ? "struct"
+                                   : TargetObject is RecordDeclarationSyntax r
+                                       ? !string.IsNullOrEmpty(r.ClassOrStructKeyword.Text)
+                                         && r.ClassOrStructKeyword.Text != "class"
+                                             ? "record " + r.ClassOrStructKeyword.Text
+                                             : "record"
+                                       : "class";
+            TargetObjectParameters = ((TargetObject as RecordDeclarationSyntax)
+                                      ?.ParameterList
+                                      ?.Parameters)
+                                     .GetValueOrDefault()
+                                     .Select(x => x.Identifier.Text)
+                                     .ToArray();
         }
 
-        public readonly TypeDeclarationSyntax TargetClass;
-        public readonly INamedTypeSymbol[]    SourceClassNames;
+        public readonly TypeDeclarationSyntax TargetObject;
+        public readonly INamedTypeSymbol[]    SourceObjectNames;
         public readonly bool                  AttributeFound;
+        public readonly string                TargetObjectType;
+        public readonly string[]              TargetObjectParameters;
     }
 }

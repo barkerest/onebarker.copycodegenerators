@@ -34,11 +34,21 @@ namespace " + Namespace + @"
 
         private const string FullAttributeName = Namespace + "." + AttributeName;
 
+        private readonly CopyCodeGenerator _generator = new CopyCodeGenerator(
+            (target, source, param, set)
+                => $"public new {target} CopyFrom({source} {param})",
+            (target, source, set)
+                => "Copies properties from the source object to this object and returns this object.",
+            "CopyFrom",
+            CopyCodeGenerator.MethodReturnType.This,
+            addBeforeMethod: true,
+            addAfterMethod: true
+        );
+
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
             // Add the marker attribute to the compilation.
-            context.RegisterPostInitializationOutput(
-                ctx => ctx.AddSource(
+            context.RegisterPostInitializationOutput(ctx => ctx.AddSource(
                     $"{AttributeName}.g.cs",
                     SourceText.From(AttributeSourceCode, Encoding.UTF8)
                 )
@@ -56,18 +66,7 @@ namespace " + Namespace + @"
             // Generate the source code.
             context.RegisterSourceOutput(
                 context.CompilationProvider.Combine(provider.Collect()),
-                (ctx, t) => ctx.GenerateCopyCode(
-                    t.Left,
-                    t.Right,
-                    (target, source, param, set) => $"public new {target} CopyFrom({source} {param})",
-                    (target, source) =>
-                        "Copies properties from the source object to this object and returns this object.",
-                    "CopyFrom",
-                    true,
-                    false,
-                    true,
-                    true
-                )
+                (ctx, t) => _generator.Generate(ctx, t.Left, t.Right)
             );
         }
     }

@@ -35,6 +35,16 @@ namespace " + Namespace + @"
 
         private const string FullAttributeName = Namespace + "." + AttributeName;
 
+        private readonly CopyCodeGenerator _generator = new CopyCodeGenerator(
+            GenerateDeclaration,
+            (target, source, set)
+                => $"Creates an instance of {target} with values from the provided object.",
+            "Construct",
+            CopyCodeGenerator.MethodReturnType.Constructor,
+            addBeforeMethod: false,
+            addAfterMethod: true
+        );
+        
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
             // Add the marker attribute to the compilation.
@@ -57,21 +67,11 @@ namespace " + Namespace + @"
             // Generate the source code.
             context.RegisterSourceOutput(
                 context.CompilationProvider.Combine(provider.Collect()),
-                (ctx, t) => ctx.GenerateCopyCode(
-                    t.Left,
-                    t.Right,
-                    GenerateDeclaration,
-                    (target, source) => $"Creates an instance of {target} with values from the provided object.",
-                    "Construct",
-                    false,
-                    false,
-                    false,
-                    true
-                )
+                (ctx, t) => _generator.Generate(ctx, t.Left, t.Right)
             );
         }
 
-        private string GenerateDeclaration(
+        private static string GenerateDeclaration(
             string                  targetClass,
             string                  sourceClass,
             string                  paramName,
@@ -79,7 +79,7 @@ namespace " + Namespace + @"
         )
         {
             var haveDefaultConstructor = set
-                                         .TargetClass
+                                         .TargetObject
                                          .ChildNodes()
                                          .OfType<ConstructorDeclarationSyntax>()
                                          .Any(x => x.ParameterList.Parameters.Count == 0);
@@ -89,11 +89,11 @@ namespace " + Namespace + @"
             var callDefault                                             = haveDefaultConstructor ? " : this()" : "";
             
             // record copy constructors cannot call "this()".
-            if (set.TargetClass is RecordDeclarationSyntax && string.Equals(targetClass, sourceClass)) callDefault = "";
+            if (set.TargetObject is RecordDeclarationSyntax && string.Equals(targetClass, sourceClass)) callDefault = "";
             
             // records with parameterized constructors must have the primary constructor called.
             var recParamList =
-                ((set.TargetClass as RecordDeclarationSyntax)?.ParameterList?.Parameters)
+                ((set.TargetObject as RecordDeclarationSyntax)?.ParameterList?.Parameters)
                 .GetValueOrDefault()
                 .ToArray();
 
