@@ -187,6 +187,9 @@ namespace OneBarker.CopyCodeGenerators
         private readonly bool                         _addBeforeMethod;
         private readonly bool                         _addAfterMethod;
         private readonly bool                         _swapSourceAndTarget;
+        private readonly string                       _paramName;
+        private readonly string                       _sourceName;
+        private readonly string                       _targetName;
 
         /// <summary>
         /// Creates a copy code generator.
@@ -215,6 +218,9 @@ namespace OneBarker.CopyCodeGenerators
             _addBeforeMethod      = addBeforeMethod;
             _addAfterMethod       = addAfterMethod;
             _swapSourceAndTarget  = swapSourceAndTarget;
+            _paramName            = _swapSourceAndTarget ? "target" : "source";
+            _sourceName           = _swapSourceAndTarget ? "this" : _paramName;
+            _targetName           = _swapSourceAndTarget ? _paramName : "this";
         }
 
 
@@ -262,8 +268,8 @@ namespace OneBarker.CopyCodeGenerators
                 var targetMembers = GetPropertiesAndFields(
                     classSymbol,
                     true,
-                    false,
-                    _returnType == MethodReturnType.Constructor
+                    _swapSourceAndTarget,
+                    _swapSourceAndTarget || _returnType == MethodReturnType.Constructor
                 );
 
                 foreach (var sourceClassSymbol in classDeclarationSet.set.SourceObjectNames
@@ -279,10 +285,21 @@ namespace OneBarker.CopyCodeGenerators
                         sourceClassName = className;
                         members         = targetMembers;
                     }
+                    else if (_swapSourceAndTarget)
+                    {
+                        sourceClassName = className;
+                        
+                        // copying to a type, we can only touch public writable properties and fields.
+                        var sourceMembers = GetPropertiesAndFields(sourceClassSymbol, false, false, false);
+                        // and we'll use the members from the "source" since that is where we are copying to.
+                        members = sourceMembers.Where(x => targetMembers.Any(x.Equals)).ToArray();
+                    }
                     else
                     {
                         sourceClassName = $"{sourceClassSymbol.ContainingNamespace}.{sourceClassSymbol.Name}";
+                        // copying from a type, we can use any readable property or field.
                         var sourceMembers = GetPropertiesAndFields(sourceClassSymbol, false, true, true);
+                        // and we'll use the members from the "target" since that is where we are copying to.
                         members = targetMembers.Where(x => sourceMembers.Any(x.Equals)).ToArray();
                     }
 
@@ -292,7 +309,7 @@ namespace OneBarker.CopyCodeGenerators
                     var declaration = _getMethodDeclaration(
                         className,
                         sourceClassName,
-                        "source",
+                        _paramName,
                         classDeclarationSet.set
                     );
                     var comment = _getMethodComment(className, sourceClassName, classDeclarationSet.set);
@@ -309,10 +326,11 @@ namespace OneBarker.CopyCodeGenerators
     /// <summary>
     /// Method to run before the {0} method begins copying values.
     /// </summary>
-    partial void Before{0}({1} source, ref int changeCount);
+    partial void Before{0}({1} {2}, ref int changeCount);
 ",
                                 _extraMethodBaseName,
-                                sourceClassName
+                                sourceClassName,
+                                _paramName
                             );
                         }
                         else
@@ -322,10 +340,11 @@ namespace OneBarker.CopyCodeGenerators
     /// <summary>
     /// Method to run before the {0} method begins copying values.
     /// </summary>
-    partial void Before{0}({1} source);
+    partial void Before{0}({1} {2});
 ",
                                 _extraMethodBaseName,
-                                sourceClassName
+                                sourceClassName,
+                                _paramName
                             );
                         }
                     }
@@ -339,10 +358,11 @@ namespace OneBarker.CopyCodeGenerators
     /// <summary>
     /// Method to run after the {0} method finishes copying values.
     /// </summary>
-    partial void After{0}({1} source, ref int changeCount);
+    partial void After{0}({1} {2}, ref int changeCount);
 ",
                                 _extraMethodBaseName,
-                                sourceClassName
+                                sourceClassName,
+                                _paramName
                             );
                         }
                         else
@@ -352,10 +372,11 @@ namespace OneBarker.CopyCodeGenerators
     /// <summary>
     /// Method to run after the {0} method finishes copying values.
     /// </summary>
-    partial void After{0}({1} source);
+    partial void After{0}({1} {2});
 ",
                                 _extraMethodBaseName,
-                                sourceClassName
+                                sourceClassName,
+                                _paramName
                             );
                         }
                     }
@@ -375,26 +396,29 @@ namespace OneBarker.CopyCodeGenerators
                     // if the method isn't returning, it would be a constructor, so no need for a check.
                     if (_returnType == MethodReturnType.Count)
                     {
-                        body.Append(
+                        body.AppendFormat(
                             @"
-        if (ReferenceEquals(null, source)) throw new ArgumentNullException();
-        if (ReferenceEquals(this, source)) return 0;
-        var changeCount = 0;"
+        if (ReferenceEquals(null, {0})) throw new ArgumentNullException();
+        if (ReferenceEquals(this, {0})) return 0;
+        var changeCount = 0;",
+                            _paramName
                         );
                     }
                     else if (_returnType == MethodReturnType.This)
                     {
-                        body.Append(
+                        body.AppendFormat(
                             @"
-        if (ReferenceEquals(null, source)) throw new ArgumentNullException();
-        if (ReferenceEquals(this, source)) return this;"
+        if (ReferenceEquals(null, {0})) throw new ArgumentNullException();
+        if (ReferenceEquals(this, {0})) return this;",
+                            _paramName
                         );
                     }
                     else
                     {
-                        body.Append(
+                        body.AppendFormat(
                             @"
-        if (ReferenceEquals(null, source)) throw new ArgumentNullException();"
+        if (ReferenceEquals(null, {0})) throw new ArgumentNullException();",
+                            _paramName
                         );
                     }
 
@@ -404,16 +428,18 @@ namespace OneBarker.CopyCodeGenerators
                         {
                             body.AppendFormat(
                                 @"
-        Before{0}(source, ref changeCount);",
-                                _extraMethodBaseName
+        Before{0}({1}, ref changeCount);",
+                                _extraMethodBaseName,
+                                _paramName
                             );
                         }
                         else
                         {
                             body.AppendFormat(
                                 @"
-        Before{0}(source);",
-                                _extraMethodBaseName
+        Before{0}({1});",
+                                _extraMethodBaseName,
+                                _paramName
                             );
                         }
                     }
@@ -430,6 +456,7 @@ namespace OneBarker.CopyCodeGenerators
     static partial void {_extraMethodBaseName}Transform_{p.Name}(ref {p.Type} value);";
                         }
 
+                        // passthroughs will only be used against a "source" parameter.
                         if (useInitPassthroughs)
                         {
                             transforms[$"~{p.Name}_{sourceClassName}"] = $@"
@@ -444,16 +471,16 @@ namespace OneBarker.CopyCodeGenerators
         return value;
     }}";
                         }
-
-
+                        
                         // property setting for parameterized properties is handled via the passthroughs only.
                         if (useInitPassthroughs && recParamList.Contains(p.Name)) continue;
 
+                        // TODO: Swap from to- to from-.
                         var isNotNullable = !p.Type.IsValueType &&
                                             p.Type.NullableAnnotation != NullableAnnotation.Annotated;
 
-                        var sourceName = "source_" + p.Name;
-                        var targetName = "this_"   + p.Name;
+                        var sourceName = $"{_sourceName}_{p.Name}";
+                        var targetName = $"{_targetName}_{p.Name}";
                         if (_returnType == MethodReturnType.Count)
                         {
                             if (p.Type.IsValueType)
@@ -461,17 +488,19 @@ namespace OneBarker.CopyCodeGenerators
                                 // value types are easy.
                                 body.AppendFormat(
                                     @"
-        var {2} = this.{0};
-        var {1} = source.{0};
+        var {2} = {5}.{0};
+        var {1} = {4}.{0};
         {3}Transform_{0}(ref {1});
         if (!{2}.Equals({1})) {{
-            this.{0} = {1};
+            {5}.{0} = {1};
             changeCount++;
         }}",
                                     p.Name,
                                     sourceName,
                                     targetName,
-                                    _extraMethodBaseName
+                                    _extraMethodBaseName,
+                                    _sourceName,
+                                    _targetName
                                 );
                             }
                             else if (isNotNullable)
@@ -481,17 +510,19 @@ namespace OneBarker.CopyCodeGenerators
                                 // we'll just throw in a null check before calling Equals()
                                 body.AppendFormat(
                                     @"
-        var {2} = this.{0};
-        var {1} = source.{0};
+        var {2} = {5}.{0};
+        var {1} = {4}.{0};
         {3}Transform_{0}(ref {1});
         if (!ReferenceEquals({2}, {1}) && (ReferenceEquals(null, {2}) || !{2}.Equals({1}))) {{
-            this.{0} = {1};
+            {5}.{0} = {1};
             changeCount++;
         }}",
                                     p.Name,
                                     sourceName,
                                     targetName,
-                                    _extraMethodBaseName
+                                    _extraMethodBaseName,
+                                    _sourceName,
+                                    _targetName
                                 );
                             }
                             else
@@ -499,17 +530,19 @@ namespace OneBarker.CopyCodeGenerators
                                 // nullable reference types don't need the null check on the source before processing.
                                 body.AppendFormat(
                                     @"
-        var {2} = this.{0};
-        var {1} = source.{0};
+        var {2} = {5}.{0};
+        var {1} = {4}.{0};
         {3}Transform_{0}(ref {1});
         if (!ReferenceEquals({2}, {1}) && (ReferenceEquals(null, {2}) || (!ReferenceEquals(null, {2}) && !{2}.Equals({1})))) {{
-            this.{0} = {1};
+            {5}.{0} = {1};
             changeCount++;
         }}",
                                     p.Name,
                                     sourceName,
                                     targetName,
-                                    _extraMethodBaseName
+                                    _extraMethodBaseName,
+                                    _sourceName,
+                                    _targetName
                                 );
                             }
                         }
@@ -518,13 +551,15 @@ namespace OneBarker.CopyCodeGenerators
                             // don't check for changes, just copy the value over.
                             body.AppendFormat(
                                 @"
-        var {1} = source.{0};
+        var {1} = {4}.{0};
         {3}Transform_{0}(ref {1});
-        this.{0} = {1};",
+        {5}.{0} = {1};",
                                 p.Name,
                                 sourceName,
                                 targetName,
-                                _extraMethodBaseName
+                                _extraMethodBaseName,
+                                _sourceName,
+                                _targetName
                             );
                         }
                     }
@@ -535,23 +570,24 @@ namespace OneBarker.CopyCodeGenerators
                         {
                             body.AppendFormat(
                                 @"
-        After{0}(source, ref changeCount);",
-                                _extraMethodBaseName
+        After{0}({1}, ref changeCount);",
+                                _extraMethodBaseName,
+                                _paramName
                             );
                         }
                         else
                         {
                             body.AppendFormat(
                                 @"
-        After{0}(source);",
-                                _extraMethodBaseName
+        After{0}({1});",
+                                _extraMethodBaseName,
+                                _paramName
                             );
                         }
                     }
 
                     switch (_returnType)
                     {
-                        case MethodReturnType.Target:
                         case MethodReturnType.This:
                             body.Append("\n        return this;");
                             break;
@@ -559,7 +595,10 @@ namespace OneBarker.CopyCodeGenerators
                             body.Append("\n        return changeCount;");
                             break;
                         case MethodReturnType.Source:
-                            body.Append("\n        return source;");
+                            body.AppendFormat("\n        return {0};", _sourceName);
+                            break;
+                        case MethodReturnType.Target:
+                            body.AppendFormat("\n        return {0};", _targetName);
                             break;
                     }
                     
