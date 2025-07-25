@@ -12,7 +12,7 @@ using Xunit.Abstractions;
 
 namespace OneBarker.CopyCodeGenerators.Tests;
 
-public partial class CopyInitUpdateFromSourceGeneratorTests
+public partial class CopyInitUpdateSourceGeneratorTests
 {
     
     #region Test Data
@@ -63,7 +63,25 @@ public partial class CopyInitUpdateFromSourceGeneratorTests
                         data.AddUpdate(resultName, File.ReadAllText(resultFile));
                     }
                 }
-
+                resultDir = Path.Join(subdir, "CopyTo");
+                if (Directory.Exists(resultDir))
+                {
+                    foreach (var resultFile in Directory.GetFiles(resultDir, "*.cs", SearchOption.TopDirectoryOnly))
+                    {
+                        var resultName = Path.GetFileName(resultFile);
+                        data.AddCopyTo(resultName, File.ReadAllText(resultFile));
+                    }
+                }
+                resultDir = Path.Join(subdir, "UpdateTo");
+                if (Directory.Exists(resultDir))
+                {
+                    foreach (var resultFile in Directory.GetFiles(resultDir, "*.cs", SearchOption.TopDirectoryOnly))
+                    {
+                        var resultName = Path.GetFileName(resultFile);
+                        data.AddUpdateTo(resultName, File.ReadAllText(resultFile));
+                    }
+                }
+                
                 yield return data;
             }
         }
@@ -92,17 +110,33 @@ public partial class CopyInitUpdateFromSourceGeneratorTests
             if (item.UpdateResults.Any()) yield return [item];
         }
     }
+
+    public static IEnumerable<object[]> GetCopyToData()
+    {
+        foreach (var item in AllTestData)
+        {
+            if (item.CopyToResults.Any()) yield return [item];
+        }
+    }
+
+    public static IEnumerable<object[]> GetUpdateToData()
+    {
+        foreach (var item in AllTestData)
+        {
+            if (item.UpdateToResults.Any()) yield return [item];
+        }
+    }
     
     #endregion
     
-    static CopyInitUpdateFromSourceGeneratorTests()
+    static CopyInitUpdateSourceGeneratorTests()
     {
         AllTestData = GetTestData().ToArray();
     }
 
     private readonly ITestOutputHelper _output;
 
-    public CopyInitUpdateFromSourceGeneratorTests(ITestOutputHelper output)
+    public CopyInitUpdateSourceGeneratorTests(ITestOutputHelper output)
     {
         _output = output;
     }
@@ -168,7 +202,7 @@ public partial class CopyInitUpdateFromSourceGeneratorTests
 
         // We need to create a compilation with the required source code.
         var compilation = CSharpCompilation.Create(
-            nameof(CopyInitUpdateFromSourceGeneratorTests),
+            nameof(CopyInitUpdateSourceGeneratorTests),
             new[] { CSharpSyntaxTree.ParseText(data.Source) },
             GetMetadataReferences()
         );
@@ -178,6 +212,40 @@ public partial class CopyInitUpdateFromSourceGeneratorTests
 
         // All generated files can be found in 'RunResults.GeneratedTrees'.
         foreach (var (name, source) in data.CopyResults)
+        {
+            _output.WriteLine($"Checking '{name}'...");
+            var generatedFile = runResult.GeneratedTrees.Single(
+                t => t.FilePath.EndsWith(name)
+            );
+            var actual = generatedFile.GetText().ToString();
+            Assert.Equal(source, actual, ignoreLineEndingDifferences: true, ignoreWhiteSpaceDifferences: true);
+        }
+    }
+    
+    [Theory]
+    [MemberData(nameof(GetCopyToData))]
+    public void GenerateCopyToMethod(CopyTestData data)
+    {
+        OutputComments(data);
+        
+        // Create an instance of the source generator.
+        var generator = new CopyToSourceGenerator();
+
+        // Source generators should be tested using 'GeneratorDriver'.
+        var driver = CSharpGeneratorDriver.Create(generator);
+
+        // We need to create a compilation with the required source code.
+        var compilation = CSharpCompilation.Create(
+            nameof(CopyInitUpdateSourceGeneratorTests),
+            new[] { CSharpSyntaxTree.ParseText(data.Source) },
+            GetMetadataReferences()
+        );
+
+        // Run generators and retrieve all results.
+        var runResult = driver.RunGenerators(compilation).GetRunResult();
+
+        // All generated files can be found in 'RunResults.GeneratedTrees'.
+        foreach (var (name, source) in data.CopyToResults)
         {
             _output.WriteLine($"Checking '{name}'...");
             var generatedFile = runResult.GeneratedTrees.Single(
@@ -202,7 +270,7 @@ public partial class CopyInitUpdateFromSourceGeneratorTests
 
         // We need to create a compilation with the required source code.
         var compilation = CSharpCompilation.Create(
-            nameof(CopyInitUpdateFromSourceGeneratorTests),
+            nameof(CopyInitUpdateSourceGeneratorTests),
             new[] { CSharpSyntaxTree.ParseText(data.Source) },
             
             GetMetadataReferences()
@@ -237,7 +305,7 @@ public partial class CopyInitUpdateFromSourceGeneratorTests
 
         // We need to create a compilation with the required source code.
         var compilation = CSharpCompilation.Create(
-            nameof(CopyInitUpdateFromSourceGeneratorTests),
+            nameof(CopyInitUpdateSourceGeneratorTests),
             new[] { CSharpSyntaxTree.ParseText(data.Source) },
             GetMetadataReferences()
         );
@@ -257,5 +325,38 @@ public partial class CopyInitUpdateFromSourceGeneratorTests
         }
     }
 
+    [Theory]
+    [MemberData(nameof(GetUpdateToData))]
+    public void GenerateUpdateTargetMethod(CopyTestData data)
+    {
+        OutputComments(data);
+        
+        // Create an instance of the source generator.
+        var generator = new UpdateTargetSourceGenerator();
+
+        // Source generators should be tested using 'GeneratorDriver'.
+        var driver = CSharpGeneratorDriver.Create(generator);
+
+        // We need to create a compilation with the required source code.
+        var compilation = CSharpCompilation.Create(
+            nameof(CopyInitUpdateSourceGeneratorTests),
+            new[] { CSharpSyntaxTree.ParseText(data.Source) },
+            GetMetadataReferences()
+        );
+
+        // Run generators and retrieve all results.
+        var runResult = driver.RunGenerators(compilation).GetRunResult();
+
+        // All generated files can be found in 'RunResults.GeneratedTrees'.
+        foreach (var (name, source) in data.UpdateToResults)
+        {
+            _output.WriteLine($"Checking '{name}'...");
+            var generatedFile = runResult.GeneratedTrees.Single(
+                t => t.FilePath.EndsWith(name)
+            );
+            var actual = generatedFile.GetText().ToString();
+            Assert.Equal(source, actual, ignoreLineEndingDifferences: true, ignoreWhiteSpaceDifferences: true);
+        }
+    }
     
 }

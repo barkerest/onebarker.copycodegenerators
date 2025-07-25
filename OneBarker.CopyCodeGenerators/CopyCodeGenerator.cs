@@ -106,6 +106,10 @@ namespace OneBarker.CopyCodeGenerators
                 {
                     symProps  = symProps.Where(x => x.IsReadOnly  != true);
                     symFields = symFields.Where(x => x.IsReadOnly != true);
+                    if (!includeNonPublic)
+                    {
+                        symProps = symProps.Where(x => x.SetMethod != null && x.SetMethod.DeclaredAccessibility == Accessibility.Public);
+                    }
                 }
 
                 if (!includeReadOnly && !includeInitOnly)
@@ -267,7 +271,7 @@ namespace OneBarker.CopyCodeGenerators
 
                 var targetMembers = GetPropertiesAndFields(
                     classSymbol,
-                    true,
+                    !_swapSourceAndTarget,
                     _swapSourceAndTarget,
                     _swapSourceAndTarget || _returnType == MethodReturnType.Constructor
                 );
@@ -287,8 +291,7 @@ namespace OneBarker.CopyCodeGenerators
                     }
                     else if (_swapSourceAndTarget)
                     {
-                        sourceClassName = className;
-                        
+                        sourceClassName = $"{sourceClassSymbol.ContainingNamespace}.{sourceClassSymbol.Name}";
                         // copying to a type, we can only touch public writable properties and fields.
                         var sourceMembers = GetPropertiesAndFields(sourceClassSymbol, false, false, false);
                         // and we'll use the members from the "source" since that is where we are copying to.
@@ -305,10 +308,14 @@ namespace OneBarker.CopyCodeGenerators
 
                     var useInitPassthroughs = addInitPassthroughs && !string.Equals(sourceClassName, className);
 
+                    var classRef =
+                        ((_swapSourceAndTarget && sourceClassSymbol.IsValueType)
+                             ? "ref "
+                             : "");
 
                     var declaration = _getMethodDeclaration(
                         className,
-                        sourceClassName,
+                        classRef + sourceClassName,
                         _paramName,
                         classDeclarationSet.set
                     );
@@ -326,11 +333,12 @@ namespace OneBarker.CopyCodeGenerators
     /// <summary>
     /// Method to run before the {0} method begins copying values.
     /// </summary>
-    partial void Before{0}({1} {2}, ref int changeCount);
+    partial void Before{0}({3}{1} {2}, ref int changeCount);
 ",
                                 _extraMethodBaseName,
                                 sourceClassName,
-                                _paramName
+                                _paramName,
+                                classRef
                             );
                         }
                         else
@@ -340,11 +348,12 @@ namespace OneBarker.CopyCodeGenerators
     /// <summary>
     /// Method to run before the {0} method begins copying values.
     /// </summary>
-    partial void Before{0}({1} {2});
+    partial void Before{0}({3}{1} {2});
 ",
                                 _extraMethodBaseName,
                                 sourceClassName,
-                                _paramName
+                                _paramName,
+                                classRef
                             );
                         }
                     }
@@ -358,11 +367,12 @@ namespace OneBarker.CopyCodeGenerators
     /// <summary>
     /// Method to run after the {0} method finishes copying values.
     /// </summary>
-    partial void After{0}({1} {2}, ref int changeCount);
+    partial void After{0}({3}{1} {2}, ref int changeCount);
 ",
                                 _extraMethodBaseName,
                                 sourceClassName,
-                                _paramName
+                                _paramName,
+                                classRef
                             );
                         }
                         else
@@ -372,11 +382,12 @@ namespace OneBarker.CopyCodeGenerators
     /// <summary>
     /// Method to run after the {0} method finishes copying values.
     /// </summary>
-    partial void After{0}({1} {2});
+    partial void After{0}({3}{1} {2});
 ",
                                 _extraMethodBaseName,
                                 sourceClassName,
-                                _paramName
+                                _paramName,
+                                classRef
                             );
                         }
                     }
@@ -428,18 +439,20 @@ namespace OneBarker.CopyCodeGenerators
                         {
                             body.AppendFormat(
                                 @"
-        Before{0}({1}, ref changeCount);",
+        Before{0}({2}{1}, ref changeCount);",
                                 _extraMethodBaseName,
-                                _paramName
+                                _paramName,
+                                classRef
                             );
                         }
                         else
                         {
                             body.AppendFormat(
                                 @"
-        Before{0}({1});",
+        Before{0}({2}{1});",
                                 _extraMethodBaseName,
-                                _paramName
+                                _paramName,
+                                classRef
                             );
                         }
                     }
@@ -570,18 +583,20 @@ namespace OneBarker.CopyCodeGenerators
                         {
                             body.AppendFormat(
                                 @"
-        After{0}({1}, ref changeCount);",
+        After{0}({2}{1}, ref changeCount);",
                                 _extraMethodBaseName,
-                                _paramName
+                                _paramName,
+                                classRef
                             );
                         }
                         else
                         {
                             body.AppendFormat(
                                 @"
-        After{0}({1});",
+        After{0}({2}{1});",
                                 _extraMethodBaseName,
-                                _paramName
+                                _paramName,
+                                classRef
                             );
                         }
                     }
