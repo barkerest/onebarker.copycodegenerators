@@ -58,7 +58,7 @@ namespace " + Namespace + @"
             // Filter classes annotated with the attribute. Only filtered Syntax Nodes can trigger code generation.
             var provider = context.SyntaxProvider
                                   .CreateSyntaxProvider(
-                                      (s,   _) => s is ClassDeclarationSyntax || s is StructDeclarationSyntax,
+                                      (s,   _) => s is ClassDeclarationSyntax || s is StructDeclarationSyntax || s is RecordDeclarationSyntax,
                                       (ctx, _) => ctx.GetCopyClassDeclarationSetForSourceGen(FullAttributeName)
                                   )
                                   .Where(t => t.AttributeFound)
