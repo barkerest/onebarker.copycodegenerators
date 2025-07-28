@@ -17,10 +17,15 @@
         <Title>Copy Code Generators</Title>
         <Description>Code generators to simplify creating copy, update, and constructor methods.</Description>
         <PackageProjectUrl>https://github.com/barkerest/onebarker.copycodegenerators</PackageProjectUrl>
-        <PackageLicenseUrl>https://opensource.org/license/mit</PackageLicenseUrl>
+        <PackageLicenseFile>LICENSE</PackageLicenseFile>
     </PropertyGroup>
     <ItemGroup>
-        <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+        <None Include="../LICENSE" Pack="true" PackagePath="" />
+        <None Include="../README.md" Pack="true" PackagePath="" />
+    </ItemGroup>
+    <ItemGroup>
+        <None Include="$(OutputPath)/$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+        <None Include="$(OutputPath)/_._" Pack="true" PackagePath="lib/netstandard2.0/_._" Visible="false" />
     </ItemGroup>
     <ItemGroup>
         <PackageReference Include="JetBrains.Annotations" Version="2025.2.0" />
@@ -30,4 +35,7 @@
         </PackageReference>
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.11.0" />
     </ItemGroup>
+    <Target Name="CreateEmptyFileBeforePack" BeforeTargets="Build">
+        <Touch Files="$(OutputPath)/_._" AlwaysCreate="true" />
+    </Target>
 </Project>
