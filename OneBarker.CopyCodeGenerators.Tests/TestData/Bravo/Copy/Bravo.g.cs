@@ -38,7 +38,9 @@ partial class Bravo
         if (ReferenceEquals(this, source)) return this;
         BeforeCopyFrom(source);
         var source_NonNullableString = source.NonNullableString;
+        if (ReferenceEquals(null, source_NonNullableString)) source_NonNullableString = Bravo.DefaultString();
         CopyFromTransform_NonNullableString(ref source_NonNullableString);
+        if (ReferenceEquals(null, source_NonNullableString)) source_NonNullableString = Bravo.DefaultString();
         this.NonNullableString = source_NonNullableString;
         var source_NullableString = source.NullableString;
         CopyFromTransform_NullableString(ref source_NullableString);

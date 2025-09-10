@@ -34,7 +34,9 @@ partial record Delta
         ConstructTransform_Age(ref source_Age);
         this.Age = source_Age;
         var source_Name = source.Name;
+        if (ReferenceEquals(null, source_Name)) source_Name = String.Empty;
         ConstructTransform_Name(ref source_Name);
+        if (ReferenceEquals(null, source_Name)) source_Name = String.Empty;
         this.Name = source_Name;
         AfterConstruct(source);
     }
@@ -54,7 +56,9 @@ partial record Delta
         ConstructTransform_Age(ref source_Age);
         this.Age = source_Age;
         var source_Name = source.Name;
+        if (ReferenceEquals(null, source_Name)) source_Name = String.Empty;
         ConstructTransform_Name(ref source_Name);
+        if (ReferenceEquals(null, source_Name)) source_Name = String.Empty;
         this.Name = source_Name;
         AfterConstruct(source);
     }

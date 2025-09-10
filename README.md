@@ -18,6 +18,168 @@ Then you can use the `[EnableCopyFrom]`, `[EnableInitFrom]`, `[EnableUpdateFrom]
 
 You can also use the `[SkipOnCopy]` attribute to mark properties/fields to be ignored.
 
+The output code examples may not match the current output.  As more features are added, the output code
+changes accordingly.
+
+## Version 1.1 updates
+
+### Default values for NRTs
+
+If your target has a non-nullable reference property, you want to ensure that property does not get set to null.
+```csharp
+class Source
+{
+    public string? MyProperty { get; set; }
+}
+
+[EnableUpdateFrom(typeof(Source))]
+partial class Target
+{
+    public string MyProperty { get; set; }
+}
+```
+
+In the above example, the `UpdateFrom` method will:
+ * Get the value of `MyProperty` from `Source`.
+ * If value is `null`, set value to `String.Empty`.
+ * Set the value of `MyProperty` in `Target` to the value.
+
+When the copy code encounters a non-nullable reference property, it hunts down a default value for it before
+generating the code.  It searches both within the type it is generating code within and the property type.
+
+The container type for the generated code is searched first, to allow for maximum customization.  If no matches
+are found in the container type, then the value type is searched.  All value providers must be static since they
+may be used before an object is initialized.  A parameterless method is the most preferred provider.  This is
+once again to allow for maximum customization.
+
+Using our example Target class above, the system would search for the following in order of preference:
+```csharp
+class Target
+{
+    // any name, as long as it's the only static parameterless method returning the type.
+    static string CustomDefaultValueMethod();
+    
+    // static methods named (Default|Empty){TypeName}(For{PropertyName})?
+    static string DefaultStringForMyProperty();
+    static string EmptyStringForMyProperty();
+    static string DefaultString();
+    static string EmptyString();
+    
+    // any name, as long as it's the only static property of the value type.
+    static string CustomDefaultValueProperty { get; }
+    
+    // static property named (Default|Empty){TypeName}(For{PropertyName})?
+    static string DefaultStringForMyProperty { get; }
+    static string EmptyStringForMyProperty { get; }
+    static string DefaultString { get; }
+    static string EmptyString { get; }
+    
+    // any name, as long as it's the only static or constant field of the value type.
+    (const|static readonly) string CustomDefaultValueField;
+    
+    // Static readonly or const fields named (Default|Empty){TypeName}(For{PropertyName})?
+    (const|static readonly) string DefaultStringForMyProperty;
+    (const|static readonly) string EmptyStringForMyProperty;
+    (const|static readonly) string DefaultString;
+    (const|static readonly) string EmptyString;
+    (const|static readonly) string _defaultStringForMyProperty;
+    (const|static readonly) string _emptyStringForMyProperty;
+    (const|static readonly) string _defaultString;
+    (const|static readonly) string _emptyString;
+}
+
+class String
+{
+    // any name, as long as it's the only static parameterless method returning the type.
+    public static string CustomDefaultValueMethod();
+    
+    // static methods
+    public static string Default();
+    public static string Empty();
+    
+    // any name, as long as it's the only static property of the value type.
+    public static string CustomDefaultValueProperty { get; }
+    
+    // static properties
+    public static string Default { get; }
+    public static string Empty { get; }
+    public static string Instance { get; }
+    public static string Value { get; }
+    
+    // any name, as long as it's the only static or constant field of the value type.
+    public (const|static readonly) string CustomDefaultValueField;
+    
+    // static readonly or constant fields.
+    public (const|static readonly) string Default;
+    public (const|static readonly) string Empty;
+    public (const|static readonly) string Instance;
+    public (const|static readonly) string Value;
+    public (const|static readonly) string _default;
+    public (const|static readonly) string _empty;
+    public (const|static readonly) string _instance;
+    public (const|static readonly) string _value;
+}
+```
+
+After going through the list, the copy code generator would then find that the best candidate for a default value for
+`MyProperty` is the static readonly `String.Empty` field.  When copying from `Source`, if a null value is found, it
+will use `String.Empty` to avoid breaking the contract with `Target`.
+
+```csharp
+class Person
+{
+    public string Name { get; set; }
+ 
+    private static int _anonCount = 1;
+    private static string DefaultStringForName() => $"anonymous #{_anonCount++}";
+}
+```
+
+If we were to use `Person` as our target, the code generator would find `DefaultStringForName()` and assign that as
+the default value if a source `Name` property returns null.
+
+If a default value cannot be found, and a null value is encountered for a non-null target, an 
+`InvalidOperationException` will be thrown by the copy code.  Luckily, you can simply define the method in the class
+containing the generated code to alleviate this error.
+
+
+### Get methods
+
+Sometimes properties just don't line up completely.  Or you need to convert data.  This can be accomplished by defining
+the `Transform` partial methods if the type is the same, or defining the `Before` or `After` partial methods for complete
+customization.  But you can also define a `Get_` method to provide a customized value and avoid having to handle too
+much boilerplate code.  The `Get_` method must be visible to the generated code and must be a parameterless instance 
+method returning the target type.  Because of these restrictions, the `Get_` method is most useful for the 
+`UpdateTarget` and `CopyTo` methods. 
+
+```csharp
+[EnableUpdateTarget(typeof(Target))]
+partial class Source
+{
+    public DateTime CreatedAt { get; set; }
+    
+    private DateOnly Get_CreatedDate() => DateOnly.FromDateTime(CreatedAt);
+}
+
+class Target
+{
+    public DateOnly CreatedDate { get; set; }
+}
+```
+
+The generated `UpdateTarget` method will read the value from `Get_CreatedDate()` and set that to the `CreatedDate`
+property of the target.
+
+Based on the idea of wanting to give you as much opportunity for customization as possible, if a `Get_` method is
+present alongside a property or a field, the method will be preferred.  Likewise, if a matching property and field
+are both present, the property is preferred over the field.  A field will only be used if no matching property
+or `Get_` method is found.  To eliminate a field, property, or `Get_` method from consideration, use the `SkipOnCopy`
+attribute to mark the unwanted item.
+
+This is only true for retrieving values.  Setting values can only be done to properties or fields.  If both a property
+and a field match on the name (eg - `_value` and `Value`), the field will be preferred over the property for setting.
+To avoid this behavior, use the `SkipOnCopy` attribute on the field to force it to use the property.
+
 
 ## EnableInitFrom
 
@@ -452,9 +614,10 @@ the method upon completion.
 
 * The attributes can be applied multiple times to your class, and each instance will 
 generate overloads taking the type you specified in the attribute.
-* The `[SkipOnCopy]` attribute can be applied to any property or field to have that property
-or field ignored in all generated code.
-There are instances where this could lead to broken code, so use it wisely.
+* The `[SkipOnCopy]` attribute can be applied to any property, field, or `Get_` method to have that property,
+ field, or method ignored in all generated code.  
+ There are instances where this could lead to broken code, so use it wisely.  
+* The `[SkipOnCopy]` attribute has no effect on the default value calculations.
 * Review the test cases included with the test project to see many more examples.
 
 

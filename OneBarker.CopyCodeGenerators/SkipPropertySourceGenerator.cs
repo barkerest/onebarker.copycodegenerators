@@ -30,7 +30,7 @@ namespace " + Namespace + @"
     /// <summary>
     /// Marks the property or field to be ignored by the copy code. 
     /// </summary>
-    [System.AttributeUsage(System.AttributeTargets.Property | System.AttributeTargets.Field, AllowMultiple = false)]
+    [System.AttributeUsage(System.AttributeTargets.Property | System.AttributeTargets.Field | System.AttributeTargets.Method, AllowMultiple = false)]
     internal class " + AttributeName + @" : Attribute
     {
     }

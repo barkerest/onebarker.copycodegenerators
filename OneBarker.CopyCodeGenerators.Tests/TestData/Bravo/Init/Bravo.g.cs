@@ -31,7 +31,9 @@ partial class Bravo
     {
         if (ReferenceEquals(null, source)) throw new ArgumentNullException();
         var source_NonNullableString = source.NonNullableString;
+        if (ReferenceEquals(null, source_NonNullableString)) source_NonNullableString = Bravo.DefaultString();
         ConstructTransform_NonNullableString(ref source_NonNullableString);
+        if (ReferenceEquals(null, source_NonNullableString)) source_NonNullableString = Bravo.DefaultString();
         this.NonNullableString = source_NonNullableString;
         var source_NullableString = source.NullableString;
         ConstructTransform_NullableString(ref source_NullableString);

@@ -40,7 +40,9 @@ partial class Bravo
         BeforeUpdateFrom(source, ref changeCount);
         var this_NonNullableString = this.NonNullableString;
         var source_NonNullableString = source.NonNullableString;
+        if (ReferenceEquals(null, source_NonNullableString)) source_NonNullableString = Bravo.DefaultString();
         UpdateFromTransform_NonNullableString(ref source_NonNullableString);
+        if (ReferenceEquals(null, source_NonNullableString)) source_NonNullableString = Bravo.DefaultString();
         if (!ReferenceEquals(this_NonNullableString, source_NonNullableString) && (ReferenceEquals(null, this_NonNullableString) || !this_NonNullableString.Equals(source_NonNullableString))) {
             this.NonNullableString = source_NonNullableString;
             changeCount++;
