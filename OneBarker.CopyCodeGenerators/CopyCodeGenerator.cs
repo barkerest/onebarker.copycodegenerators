@@ -54,7 +54,8 @@ namespace OneBarker.CopyCodeGenerators
         public delegate string GetMethodDeclarationDelegate(
             string                  targetClassName,
             string                  sourceClassName,
-            string                  paramName,
+            string                  paramName1,
+            [CanBeNull] string      paramName2,
             CopyClassDeclarationSet set
         );
 
@@ -365,7 +366,10 @@ namespace OneBarker.CopyCodeGenerators
         private readonly bool                         _addBeforeMethod;
         private readonly bool                         _addAfterMethod;
         private readonly bool                         _swapSourceAndTarget;
+        private readonly bool                         _limitToPublic;
+        private readonly bool                         _useSecondTypeFromAttribute;
         private readonly string                       _paramName;
+        private readonly string                       _param2Name;
         private readonly string                       _sourceName;
         private readonly string                       _targetName;
 
@@ -379,26 +383,45 @@ namespace OneBarker.CopyCodeGenerators
         /// <param name="addBeforeMethod"></param>
         /// <param name="addAfterMethod"></param>
         /// <param name="swapSourceAndTarget"></param>
+        /// <param name="limitToPublic"></param>
+        /// <param name="useSecondTypeFromAttribute"></param>
         public CopyCodeGenerator(
             GetMethodDeclarationDelegate getMethodDeclaration,
             GetMethodCommentDelegate     getMethodComment,
             string                       extraMethodBaseName,
             MethodReturnType             returnType,
             bool                         addBeforeMethod,
-            bool                         addAfterMethod      = true,
-            bool                         swapSourceAndTarget = false
+            bool                         addAfterMethod             = true,
+            bool                         swapSourceAndTarget        = false,
+            bool                         limitToPublic              = false,
+            bool                         useSecondTypeFromAttribute = false
         )
         {
-            _getMethodDeclaration = getMethodDeclaration;
-            _getMethodComment     = getMethodComment;
-            _extraMethodBaseName  = extraMethodBaseName;
-            _returnType           = returnType;
-            _addBeforeMethod      = addBeforeMethod;
-            _addAfterMethod       = addAfterMethod;
-            _swapSourceAndTarget  = swapSourceAndTarget;
-            _paramName            = _swapSourceAndTarget ? "target" : "source";
-            _sourceName           = _swapSourceAndTarget ? "this" : _paramName;
-            _targetName           = _swapSourceAndTarget ? _paramName : "this";
+            _getMethodDeclaration       = getMethodDeclaration;
+            _getMethodComment           = getMethodComment;
+            _extraMethodBaseName        = extraMethodBaseName;
+            _returnType                 = returnType;
+            _addBeforeMethod            = addBeforeMethod;
+            _addAfterMethod             = addAfterMethod;
+            _swapSourceAndTarget        = swapSourceAndTarget;
+            _limitToPublic              = limitToPublic;
+            _useSecondTypeFromAttribute = useSecondTypeFromAttribute;
+            if (_useSecondTypeFromAttribute)
+            {
+                _limitToPublic       = true;
+                _swapSourceAndTarget = true;
+                _paramName           = "source";
+                _param2Name          = "target";
+                _sourceName          = "source";
+                _targetName          = "target";
+            }
+            else
+            {
+                _paramName  = _swapSourceAndTarget ? "target" : "source";
+                _param2Name = "_";
+                _sourceName = _swapSourceAndTarget ? "this" : _paramName;
+                _targetName = _swapSourceAndTarget ? _paramName : "this";
+            }
         }
 
         /// <summary>
@@ -468,7 +491,7 @@ namespace OneBarker.CopyCodeGenerators
                         sourceClassName = $"{sourceClassSymbol.ContainingNamespace}.{sourceClassSymbol.Name}";
                         // copying to a type, we can only touch public writable properties and fields.
                         var sourceMembers = GetValues(sourceClassSymbol, false, false, false);
-                        
+
                         // and we'll use the members from the "source" since that is where we are copying to.
                         members = sourceMembers
                                   .Where(x => x.IsField || x.IsProperty)
@@ -497,6 +520,8 @@ namespace OneBarker.CopyCodeGenerators
                                   .ToArray();
                     }
 
+                    if (_limitToPublic) { }
+
                     var useInitPassthroughs = addInitPassthroughs && !string.Equals(sourceClassName, className);
 
                     var classRef =
@@ -508,6 +533,7 @@ namespace OneBarker.CopyCodeGenerators
                         className,
                         classRef + sourceClassName,
                         _paramName,
+                        _param2Name,
                         classDeclarationSet.set
                     );
                     var comment = _getMethodComment(className, sourceClassName, classDeclarationSet.set);

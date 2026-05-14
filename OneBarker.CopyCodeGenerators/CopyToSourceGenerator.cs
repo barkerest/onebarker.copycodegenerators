@@ -35,7 +35,7 @@ namespace " + Namespace + @"
         private const string FullAttributeName = Namespace + "." + AttributeName;
 
         private readonly CopyCodeGenerator _generator = new CopyCodeGenerator(
-            (target, source, param, set)
+            (target, source, param, _, set)
                 => $"public new {target} CopyTo({source} {param})",
             (target, source, set)
                 => "Copies properties from this object to the target object and returns the target object.",

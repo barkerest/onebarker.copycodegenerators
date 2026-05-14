@@ -75,6 +75,7 @@ namespace " + Namespace + @"
             string                  targetClass,
             string                  sourceClass,
             string                  paramName,
+            string _,
             CopyClassDeclarationSet set
         )
         {

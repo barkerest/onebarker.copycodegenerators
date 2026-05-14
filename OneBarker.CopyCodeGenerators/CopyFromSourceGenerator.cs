@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices.ComTypes;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -35,7 +36,7 @@ namespace " + Namespace + @"
         private const string FullAttributeName = Namespace + "." + AttributeName;
 
         private readonly CopyCodeGenerator _generator = new CopyCodeGenerator(
-            (target, source, param, set)
+            (target, source, param, _, set)
                 => $"public new {target} CopyFrom({source} {param})",
             (target, source, set)
                 => "Copies properties from the source object to this object and returns this object.",
