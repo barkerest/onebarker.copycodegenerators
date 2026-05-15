@@ -89,7 +89,9 @@ namespace OneBarker.CopyCodeGenerators
 
                 var symProps = symbol.GetMembers()
                                      .OfType<IPropertySymbol>()
-                                     .Where(x => x.IsWriteOnly != true);
+                                     .Where(x => !x.IsWriteOnly &&
+                                                 x.Parameters.IsEmpty
+                                     );
                 var symFields = symbol.GetMembers()
                                       .OfType<IFieldSymbol>()
                                       .Where(x => x.IsConst != true &&
@@ -366,12 +368,12 @@ namespace OneBarker.CopyCodeGenerators
         private readonly bool                         _addBeforeMethod;
         private readonly bool                         _addAfterMethod;
         private readonly bool                         _swapSourceAndTarget;
-        private readonly bool                         _limitToPublic;
         private readonly bool                         _useSecondTypeFromAttribute;
         private readonly string                       _paramName;
         private readonly string                       _param2Name;
         private readonly string                       _sourceName;
         private readonly string                       _targetName;
+        private readonly string                       _transformStatic;
 
         /// <summary>
         /// Creates a copy code generator.
@@ -383,7 +385,6 @@ namespace OneBarker.CopyCodeGenerators
         /// <param name="addBeforeMethod"></param>
         /// <param name="addAfterMethod"></param>
         /// <param name="swapSourceAndTarget"></param>
-        /// <param name="limitToPublic"></param>
         /// <param name="useSecondTypeFromAttribute"></param>
         public CopyCodeGenerator(
             GetMethodDeclarationDelegate getMethodDeclaration,
@@ -393,7 +394,6 @@ namespace OneBarker.CopyCodeGenerators
             bool                         addBeforeMethod,
             bool                         addAfterMethod             = true,
             bool                         swapSourceAndTarget        = false,
-            bool                         limitToPublic              = false,
             bool                         useSecondTypeFromAttribute = false
         )
         {
@@ -404,23 +404,23 @@ namespace OneBarker.CopyCodeGenerators
             _addBeforeMethod            = addBeforeMethod;
             _addAfterMethod             = addAfterMethod;
             _swapSourceAndTarget        = swapSourceAndTarget;
-            _limitToPublic              = limitToPublic;
             _useSecondTypeFromAttribute = useSecondTypeFromAttribute;
             if (_useSecondTypeFromAttribute)
             {
-                _limitToPublic       = true;
-                _swapSourceAndTarget = true;
+                _swapSourceAndTarget = false;
                 _paramName           = "source";
                 _param2Name          = "target";
                 _sourceName          = "source";
                 _targetName          = "target";
+                _transformStatic     = "";
             }
             else
             {
-                _paramName  = _swapSourceAndTarget ? "target" : "source";
-                _param2Name = "_";
-                _sourceName = _swapSourceAndTarget ? "this" : _paramName;
-                _targetName = _swapSourceAndTarget ? _paramName : "this";
+                _paramName       = _swapSourceAndTarget ? "target" : "source";
+                _param2Name      = "this";
+                _sourceName      = _swapSourceAndTarget ? "this" : _paramName;
+                _targetName      = _swapSourceAndTarget ? _paramName : "this";
+                _transformStatic = "static ";
             }
         }
 
@@ -473,42 +473,30 @@ namespace OneBarker.CopyCodeGenerators
                     _swapSourceAndTarget || _returnType == MethodReturnType.Constructor
                 );
 
-                foreach (var sourceClassSymbol in classDeclarationSet.set.SourceObjectNames
-                                                                     .OrderBy(x => x.ContainingNamespace.Name)
-                                                                     .ThenBy(x => x.Name))
+                foreach (var (sourceSym, targetSym) in classDeclarationSet.set.ObjectNames
+                                                                          .OrderBy(x => x.source.ContainingNamespace
+                                                                              .Name
+                                                                          )
+                                                                          .ThenBy(x => x.source.Name)
+                                                                          .ThenBy(x => x.target.ContainingNamespace.Name
+                                                                          )
+                                                                          .ThenBy(x => x.target.Name))
                 {
                     string                           sourceClassName;
+                    string                           targetClassName = className;
                     IReadOnlyCollection<ValueSymbol> members;
 
-                    if (SymbolEqualityComparer.Default.Equals(classSymbol, sourceClassSymbol))
+                    if (_useSecondTypeFromAttribute)
                     {
-                        // same class, copy 1-1
-                        sourceClassName = className;
-                        members         = targetMembers;
-                    }
-                    else if (_swapSourceAndTarget)
-                    {
-                        sourceClassName = $"{sourceClassSymbol.ContainingNamespace}.{sourceClassSymbol.Name}";
-                        // copying to a type, we can only touch public writable properties and fields.
-                        var sourceMembers = GetValues(sourceClassSymbol, false, false, false);
+                        sourceClassName = $"{sourceSym.ContainingNamespace}.{sourceSym.Name}";
+                        targetClassName = $"{targetSym.ContainingNamespace}.{targetSym.Name}";
 
-                        // and we'll use the members from the "source" since that is where we are copying to.
-                        members = sourceMembers
-                                  .Where(x => x.IsField || x.IsProperty)
-                                  // lowest to highest, prefer fields over properties.
-                                  .OrderBy(x => x.Preference)
-                                  // distinct by name/alternate name
-                                  .Distinct()
-                                  // where we can find a match in the other object.
-                                  .Where(x => x.SelectOther(targetMembers))
-                                  .ToArray();
-                    }
-                    else
-                    {
-                        sourceClassName = $"{sourceClassSymbol.ContainingNamespace}.{sourceClassSymbol.Name}";
-                        // copying from a type, we can use any readable property or field.
-                        var sourceMembers = GetValues(sourceClassSymbol, false, true, true);
-                        // and we'll use the members from the "target" since that is where we are copying to.
+                        // we can only touch public properties and fields.
+                        // source members can be read-only.
+                        var sourceMembers = GetValues(sourceSym, false, true, true);
+                        // target members must be writable.
+                        targetMembers = GetValues(targetSym, false, false, false);
+
                         members = targetMembers
                                   .Where(x => x.IsField || x.IsProperty)
                                   // lowest to highest, prefer fields over properties.
@@ -519,24 +507,69 @@ namespace OneBarker.CopyCodeGenerators
                                   .Where(x => x.SelectOther(sourceMembers))
                                   .ToArray();
                     }
+                    else
+                    {
+                        if (SymbolEqualityComparer.Default.Equals(classSymbol, sourceSym))
+                        {
+                            // same class, copy 1-1
+                            sourceClassName = className;
+                            members         = targetMembers;
+                        }
+                        else if (_swapSourceAndTarget)
+                        {
+                            sourceClassName = $"{sourceSym.ContainingNamespace}.{sourceSym.Name}";
+                            // copying to a type, we can only touch public writable properties and fields.
+                            var sourceMembers = GetValues(sourceSym, false, false, false);
 
-                    if (_limitToPublic) { }
+                            // and we'll use the members from the "source" since that is where we are copying to.
+                            members = sourceMembers
+                                      .Where(x => x.IsField || x.IsProperty)
+                                      // lowest to highest, prefer fields over properties.
+                                      .OrderBy(x => x.Preference)
+                                      // distinct by name/alternate name
+                                      .Distinct()
+                                      // where we can find a match in the other object.
+                                      .Where(x => x.SelectOther(targetMembers))
+                                      .ToArray();
+                        }
+                        else
+                        {
+                            sourceClassName = $"{sourceSym.ContainingNamespace}.{sourceSym.Name}";
+                            // copying from a type, we can use any readable property or field.
+                            var sourceMembers = GetValues(sourceSym, false, true, true);
+                            // and we'll use the members from the "target" since that is where we are copying to.
+                            members = targetMembers
+                                      .Where(x => x.IsField || x.IsProperty)
+                                      // lowest to highest, prefer fields over properties.
+                                      .OrderBy(x => x.Preference)
+                                      // distinct by name/alternate name
+                                      .Distinct()
+                                      // where we can find a match in the other object.
+                                      .Where(x => x.SelectOther(sourceMembers))
+                                      .ToArray();
+                        }
+                    }
 
-                    var useInitPassthroughs = addInitPassthroughs && !string.Equals(sourceClassName, className);
+                    var useInitPassthroughs = addInitPassthroughs && !string.Equals(sourceClassName, targetClassName);
 
-                    var classRef =
-                        ((_swapSourceAndTarget && sourceClassSymbol.IsValueType)
-                             ? "ref "
-                             : "");
+                    var sourceClassRef
+                        = _swapSourceAndTarget && sourceSym.IsValueType
+                              ? "ref "
+                              : "";
+
+                    var targetClassRef
+                        = !_swapSourceAndTarget && _useSecondTypeFromAttribute && targetSym.IsValueType
+                              ? "ref "
+                              : "";
 
                     var declaration = _getMethodDeclaration(
-                        className,
-                        classRef + sourceClassName,
+                        targetClassRef + targetClassName,
+                        sourceClassRef + sourceClassName,
                         _paramName,
                         _param2Name,
                         classDeclarationSet.set
                     );
-                    var comment = _getMethodComment(className, sourceClassName, classDeclarationSet.set);
+                    var comment = _getMethodComment(targetClassName, sourceClassName, classDeclarationSet.set);
 
 
                     var body = new StringBuilder();
@@ -545,33 +578,75 @@ namespace OneBarker.CopyCodeGenerators
                     {
                         if (_returnType == MethodReturnType.Count)
                         {
-                            body.AppendFormat(
-                                @"
+                            if (_useSecondTypeFromAttribute)
+                            {
+                                body.AppendFormat(
+                                    @"
+    /// <summary>
+    /// Method to run before the {0} method begins copying values.
+    /// </summary>
+    partial void Before{0}({3}{1} {2}, {6}{4} {5}, ref int changeCount);
+",
+                                    _extraMethodBaseName,
+                                    sourceClassName,
+                                    _paramName,
+                                    sourceClassRef,
+                                    targetClassName,
+                                    _param2Name,
+                                    targetClassRef
+                                );
+                            }
+                            else
+                            {
+                                body.AppendFormat(
+                                    @"
     /// <summary>
     /// Method to run before the {0} method begins copying values.
     /// </summary>
     partial void Before{0}({3}{1} {2}, ref int changeCount);
 ",
-                                _extraMethodBaseName,
-                                sourceClassName,
-                                _paramName,
-                                classRef
-                            );
+                                    _extraMethodBaseName,
+                                    sourceClassName,
+                                    _paramName,
+                                    sourceClassRef
+                                );
+                            }
                         }
                         else
                         {
-                            body.AppendFormat(
-                                @"
+                            if (_useSecondTypeFromAttribute)
+                            {
+                                body.AppendFormat(
+                                    @"
+    /// <summary>
+    /// Method to run before the {0} method begins copying values.
+    /// </summary>
+    partial void Before{0}({3}{1} {2}, {6}{4} {5});
+",
+                                    _extraMethodBaseName,
+                                    sourceClassName,
+                                    _paramName,
+                                    sourceClassRef,
+                                    targetClassName,
+                                    _param2Name,
+                                    targetClassRef
+                                );
+                            }
+                            else
+                            {
+                                body.AppendFormat(
+                                    @"
     /// <summary>
     /// Method to run before the {0} method begins copying values.
     /// </summary>
     partial void Before{0}({3}{1} {2});
 ",
-                                _extraMethodBaseName,
-                                sourceClassName,
-                                _paramName,
-                                classRef
-                            );
+                                    _extraMethodBaseName,
+                                    sourceClassName,
+                                    _paramName,
+                                    sourceClassRef
+                                );
+                            }
                         }
                     }
 
@@ -579,33 +654,75 @@ namespace OneBarker.CopyCodeGenerators
                     {
                         if (_returnType == MethodReturnType.Count)
                         {
-                            body.AppendFormat(
-                                @"
+                            if (_useSecondTypeFromAttribute)
+                            {
+                                body.AppendFormat(
+                                    @"
+    /// <summary>
+    /// Method to run after the {0} method finishes copying values.
+    /// </summary>
+    partial void After{0}({3}{1} {2}, {6}{4} {5}, ref int changeCount);
+",
+                                    _extraMethodBaseName,
+                                    sourceClassName,
+                                    _paramName,
+                                    sourceClassRef,
+                                    targetClassName,
+                                    _param2Name,
+                                    targetClassRef
+                                );
+                            }
+                            else
+                            {
+                                body.AppendFormat(
+                                    @"
     /// <summary>
     /// Method to run after the {0} method finishes copying values.
     /// </summary>
     partial void After{0}({3}{1} {2}, ref int changeCount);
 ",
-                                _extraMethodBaseName,
-                                sourceClassName,
-                                _paramName,
-                                classRef
-                            );
+                                    _extraMethodBaseName,
+                                    sourceClassName,
+                                    _paramName,
+                                    sourceClassRef
+                                );
+                            }
                         }
                         else
                         {
-                            body.AppendFormat(
-                                @"
+                            if (_useSecondTypeFromAttribute)
+                            {
+                                body.AppendFormat(
+                                    @"
+    /// <summary>
+    /// Method to run after the {0} method finishes copying values.
+    /// </summary>
+    partial void After{0}({3}{1} {2}, {6}{4} {5});
+",
+                                    _extraMethodBaseName,
+                                    sourceClassName,
+                                    _paramName,
+                                    sourceClassRef,
+                                    targetClassName,
+                                    _param2Name,
+                                    targetClassRef
+                                );
+                            }
+                            else
+                            {
+                                body.AppendFormat(
+                                    @"
     /// <summary>
     /// Method to run after the {0} method finishes copying values.
     /// </summary>
     partial void After{0}({3}{1} {2});
 ",
-                                _extraMethodBaseName,
-                                sourceClassName,
-                                _paramName,
-                                classRef
-                            );
+                                    _extraMethodBaseName,
+                                    sourceClassName,
+                                    _paramName,
+                                    sourceClassRef
+                                );
+                            }
                         }
                     }
 
@@ -621,28 +738,59 @@ namespace OneBarker.CopyCodeGenerators
                     );
 
                     // make sure we aren't copying onto ourselves.
-                    // if the method isn't returning, it would be a constructor, so no need for a check.
                     if (_returnType == MethodReturnType.Count)
                     {
-                        body.AppendFormat(
-                            @"
+                        if (_useSecondTypeFromAttribute)
+                        {
+                            body.AppendFormat(
+                                @"
         if (ReferenceEquals(null, {0})) throw new ArgumentNullException();
-        if (ReferenceEquals(this, {0})) return 0;
+        if (ReferenceEquals(null, {1})) throw new ArgumentNullException();
+        if (ReferenceEquals({1}, {0})) return 0;
         var changeCount = 0;",
-                            _paramName
-                        );
+                                _paramName,
+                                _param2Name
+                            );
+                        }
+                        else
+                        {
+                            body.AppendFormat(
+                                @"
+        if (ReferenceEquals(null, {0})) throw new ArgumentNullException();
+        if (ReferenceEquals({1}, {0})) return 0;
+        var changeCount = 0;",
+                                _paramName,
+                                _param2Name
+                            );
+                        }
                     }
                     else if (_returnType == MethodReturnType.This)
                     {
-                        body.AppendFormat(
-                            @"
+                        if (_useSecondTypeFromAttribute)
+                        {
+                            body.AppendFormat(
+                                @"
         if (ReferenceEquals(null, {0})) throw new ArgumentNullException();
-        if (ReferenceEquals(this, {0})) return this;",
-                            _paramName
-                        );
+        if (ReferenceEquals(null, {1})) throw new ArgumentNullException();
+        if (ReferenceEquals({1}, {0})) return {1};",
+                                _paramName,
+                                _param2Name
+                            );
+                        }
+                        else
+                        {
+                            body.AppendFormat(
+                                @"
+        if (ReferenceEquals(null, {0})) throw new ArgumentNullException();
+        if (ReferenceEquals({1}, {0})) return {1};",
+                                _paramName,
+                                _param2Name
+                            );
+                        }
                     }
                     else
                     {
+                        // if the method isn't returning, it would be a constructor, so no need for a check against this.
                         body.AppendFormat(
                             @"
         if (ReferenceEquals(null, {0})) throw new ArgumentNullException();",
@@ -654,23 +802,53 @@ namespace OneBarker.CopyCodeGenerators
                     {
                         if (_returnType == MethodReturnType.Count)
                         {
-                            body.AppendFormat(
-                                @"
+                            if (_useSecondTypeFromAttribute)
+                            {
+                                body.AppendFormat(
+                                    @"
+        Before{0}({2}{1}, {4}{3}, ref changeCount);",
+                                    _extraMethodBaseName,
+                                    _paramName,
+                                    sourceClassRef,
+                                    _param2Name,
+                                    targetClassRef
+                                );
+                            }
+                            else
+                            {
+                                body.AppendFormat(
+                                    @"
         Before{0}({2}{1}, ref changeCount);",
-                                _extraMethodBaseName,
-                                _paramName,
-                                classRef
-                            );
+                                    _extraMethodBaseName,
+                                    _paramName,
+                                    sourceClassRef
+                                );
+                            }
                         }
                         else
                         {
-                            body.AppendFormat(
-                                @"
+                            if (_useSecondTypeFromAttribute)
+                            {
+                                body.AppendFormat(
+                                    @"
+        Before{0}({2}{1}, {3}{4});",
+                                    _extraMethodBaseName,
+                                    _paramName,
+                                    sourceClassRef,
+                                    _param2Name,
+                                    targetClassRef
+                                );
+                            }
+                            else
+                            {
+                                body.AppendFormat(
+                                    @"
         Before{0}({2}{1});",
-                                _extraMethodBaseName,
-                                _paramName,
-                                classRef
-                            );
+                                    _extraMethodBaseName,
+                                    _paramName,
+                                    sourceClassRef
+                                );
+                            }
                         }
                     }
 
@@ -686,7 +864,7 @@ namespace OneBarker.CopyCodeGenerators
     /// <summary>
     /// Transforms the {targetProp.AlternateName} value before assigning the value to the target.
     /// </summary>
-    static partial void {_extraMethodBaseName}Transform_{targetProp.AlternateName}(ref {targetProp.Type} value);";
+    {_transformStatic}partial void {_extraMethodBaseName}Transform_{targetProp.AlternateName}(ref {targetProp.Type} value);";
                         }
 
                         // passthroughs will only be used against a "source" parameter.
@@ -918,23 +1096,53 @@ namespace OneBarker.CopyCodeGenerators
                     {
                         if (_returnType == MethodReturnType.Count)
                         {
-                            body.AppendFormat(
-                                @"
+                            if (_useSecondTypeFromAttribute)
+                            {
+                                body.AppendFormat(
+                                    @"
+        After{0}({2}{1}, {4}{3}, ref changeCount);",
+                                    _extraMethodBaseName,
+                                    _paramName,
+                                    sourceClassRef,
+                                    _param2Name,
+                                    targetClassRef
+                                );
+                            }
+                            else
+                            {
+                                body.AppendFormat(
+                                    @"
         After{0}({2}{1}, ref changeCount);",
-                                _extraMethodBaseName,
-                                _paramName,
-                                classRef
-                            );
+                                    _extraMethodBaseName,
+                                    _paramName,
+                                    sourceClassRef
+                                );
+                            }
                         }
                         else
                         {
-                            body.AppendFormat(
-                                @"
+                            if (_useSecondTypeFromAttribute)
+                            {
+                                body.AppendFormat(
+                                    @"
+        After{0}({2}{1}, {4}{3});",
+                                    _extraMethodBaseName,
+                                    _paramName,
+                                    sourceClassRef,
+                                    _param2Name,
+                                    targetClassRef
+                                );
+                            }
+                            else
+                            {
+                                body.AppendFormat(
+                                    @"
         After{0}({2}{1});",
-                                _extraMethodBaseName,
-                                _paramName,
-                                classRef
-                            );
+                                    _extraMethodBaseName,
+                                    _paramName,
+                                    sourceClassRef
+                                );
+                            }
                         }
                     }
 

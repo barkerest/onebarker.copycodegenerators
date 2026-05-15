@@ -8,11 +8,12 @@ public class CopyTestData
 
     public string Source { get; init; } = "";
 
-    private readonly Dictionary<string, string> _copies    = new();
-    private readonly Dictionary<string, string> _inits     = new();
-    private readonly Dictionary<string, string> _updates   = new();
-    private readonly Dictionary<string, string> _copyTos   = new();
-    private readonly Dictionary<string, string> _updateTos = new();
+    private readonly Dictionary<string, string> _copies     = new();
+    private readonly Dictionary<string, string> _inits      = new();
+    private readonly Dictionary<string, string> _updates    = new();
+    private readonly Dictionary<string, string> _copyTos    = new();
+    private readonly Dictionary<string, string> _updateTos  = new();
+    private readonly Dictionary<string, string> _updateExts = new();
 
     public void AddCopy(string name, string source)
     {
@@ -38,6 +39,11 @@ public class CopyTestData
     {
         _updateTos[name] = source;
     }
+
+    public void AddUpdateExternal(string name, string source)
+    {
+        _updateExts[name] = source;
+    }
     
     public IEnumerable<KeyValuePair<string, string>> CopyResults   => _copies;
     public IEnumerable<KeyValuePair<string, string>> InitResults   => _inits;
@@ -46,6 +52,8 @@ public class CopyTestData
     public IEnumerable<KeyValuePair<string, string>> CopyToResults => _copyTos;
 
     public IEnumerable<KeyValuePair<string, string>> UpdateToResults => _updateTos;
+
+    public IEnumerable<KeyValuePair<string, string>> UpdateExternalResults => _updateExts;
     
     public override string ToString() => Name;
 }

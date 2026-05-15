@@ -6,7 +6,6 @@ using System.Reflection;
 using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.Testing;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -81,6 +80,16 @@ public partial class CopyInitUpdateSourceGeneratorTests
                         data.AddUpdateTo(resultName, File.ReadAllText(resultFile));
                     }
                 }
+
+                resultDir = Path.Join(subdir, "UpdateExt");
+                if (Directory.Exists(resultDir))
+                {
+                    foreach (var resultFile in Directory.GetFiles(resultDir, "*.cs", SearchOption.TopDirectoryOnly))
+                    {
+                        var resultName = Path.GetFileName(resultFile);
+                        data.AddUpdateExternal(resultName, File.ReadAllText(resultFile));
+                    }
+                }
                 
                 yield return data;
             }
@@ -126,6 +135,15 @@ public partial class CopyInitUpdateSourceGeneratorTests
             if (item.UpdateToResults.Any()) yield return [item];
         }
     }
+    
+    public static IEnumerable<object[]> GetUpdateExternalData()
+    {
+        foreach (var item in AllTestData)
+        {
+            if (item.UpdateExternalResults.Any()) yield return [item];
+        }
+    }
+
     
     #endregion
     
@@ -349,6 +367,40 @@ public partial class CopyInitUpdateSourceGeneratorTests
 
         // All generated files can be found in 'RunResults.GeneratedTrees'.
         foreach (var (name, source) in data.UpdateToResults)
+        {
+            _output.WriteLine($"Checking '{name}'...");
+            var generatedFile = runResult.GeneratedTrees.Single(
+                t => t.FilePath.EndsWith(name)
+            );
+            var actual = generatedFile.GetText().ToString();
+            Assert.Equal(source, actual, ignoreLineEndingDifferences: true, ignoreWhiteSpaceDifferences: true);
+        }
+    }
+    
+    [Theory]
+    [MemberData(nameof(GetUpdateExternalData))]
+    public void GenerateUpdateExternalMethod(CopyTestData data)
+    {
+        OutputComments(data);
+        
+        // Create an instance of the source generator.
+        var generator = new UpdateExternalSourceGenerator();
+
+        // Source generators should be tested using 'GeneratorDriver'.
+        var driver = CSharpGeneratorDriver.Create(generator);
+
+        // We need to create a compilation with the required source code.
+        var compilation = CSharpCompilation.Create(
+            nameof(CopyInitUpdateSourceGeneratorTests),
+            new[] { CSharpSyntaxTree.ParseText(data.Source) },
+            GetMetadataReferences()
+        );
+
+        // Run generators and retrieve all results.
+        var runResult = driver.RunGenerators(compilation).GetRunResult();
+
+        // All generated files can be found in 'RunResults.GeneratedTrees'.
+        foreach (var (name, source) in data.UpdateExternalResults)
         {
             _output.WriteLine($"Checking '{name}'...");
             var generatedFile = runResult.GeneratedTrees.Single(

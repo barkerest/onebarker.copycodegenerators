@@ -44,7 +44,8 @@ namespace " + Namespace + @"
             "UpdateExternal",
             CopyCodeGenerator.MethodReturnType.Count,
             addBeforeMethod: true,
-            addAfterMethod: true
+            addAfterMethod: true,
+            useSecondTypeFromAttribute: true
         );
         
         public void Initialize(IncrementalGeneratorInitializationContext context)

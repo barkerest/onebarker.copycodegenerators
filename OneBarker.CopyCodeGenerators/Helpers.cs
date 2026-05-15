@@ -20,7 +20,7 @@ namespace OneBarker.CopyCodeGenerators
             var classDeclarationSyntax = (TypeDeclarationSyntax)context.Node;
 
             // Go through all attributes of the class.
-            var sources = new List<INamedTypeSymbol>();
+            var sources = new List<(INamedTypeSymbol,INamedTypeSymbol)>();
 
             foreach (AttributeListSyntax attributeListSyntax in classDeclarationSyntax.AttributeLists)
             {
@@ -35,14 +35,34 @@ namespace OneBarker.CopyCodeGenerators
                     // Check the full name of the attribute.
                     if (attributeName == fullAttributeName)
                     {
-                        var paramSyntax = attributeSyntax.ArgumentList?.Arguments.FirstOrDefault();
-                        if (paramSyntax is null) continue;
+                        if (attributeSyntax.ArgumentList is null) continue;
+                        var argList     = attributeSyntax.ArgumentList.Arguments;
+                        
+                        if (argList.Count < 1) continue;
+                        var paramSyntax = argList[0];
                         var typeofExpression = paramSyntax.Expression as TypeOfExpressionSyntax;
                         if (typeofExpression is null) continue;
                         var sourceTypeName =
                             context.SemanticModel.GetSymbolInfo(typeofExpression.Type).Symbol as INamedTypeSymbol;
                         if (sourceTypeName is null) continue;
-                        sources.Add(sourceTypeName);
+                        if (argList.Count < 2)
+                        {
+                            // an attribute with a single argument uses the same type name in both arrays.
+                            // the second array will be unused.
+                            sources.Add((sourceTypeName, sourceTypeName));
+                        }
+                        else
+                        {
+                            // an attribute with two arguments has the source type as the first and the target type
+                            // as the second argument.
+                            paramSyntax      = argList[1];
+                            typeofExpression = paramSyntax.Expression as TypeOfExpressionSyntax;
+                            if (typeofExpression is null) continue;
+                            var targetTypeName =
+                                context.SemanticModel.GetSymbolInfo(typeofExpression.Type).Symbol as INamedTypeSymbol;
+                            if (targetTypeName is null) continue;
+                            sources.Add((sourceTypeName,targetTypeName));
+                        }
                     }
                 }
             }

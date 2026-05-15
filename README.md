@@ -14,12 +14,19 @@ Include this library with the following reference (using the appropriate version
 ```
 
 Then you can use the `[EnableCopyFrom]`, `[EnableInitFrom]`, `[EnableUpdateFrom]`, 
-`[EnableCopyTo]`, and `[EnableUpdateTarget]` attributes in your code.
+`[EnableCopyTo]`, `[EnableUpdateTarget]`, and `[EnableUpdateExternal]` attributes in your code.
 
 You can also use the `[SkipOnCopy]` attribute to mark properties/fields to be ignored.
 
 The output code examples may not match the current output.  As more features are added, the output code
 changes accordingly.
+
+
+## Version 1.2 updates
+
+Added the `[EnableUpdateExternal]` attribute and generators to allow creating copy code when you don't have the
+ability or desire to touch the source type(s).
+
 
 ## Version 1.1 updates
 
@@ -608,6 +615,90 @@ to `target`.  The change count is still tracked, and the `BeforeUpdateTarget` an
 methods still have an opportunity to update the count.  The change count is still returned from
 the method upon completion.
 
+
+## EnableUpdateExternal
+
+The `[EnableUpdateExternal]` attribute creates a new `UpdateExternal` method in the marked object.  
+Supported marked types are `class`, `record`, `struct`, and `record struct`.  
+Supported source and target types are `class`, `struct`, and `interface`.  Basically any type that can implement
+read/write properties or fields.
+
+```csharp
+// MyVectorCopier.cs -- your code
+namespace Test;
+
+[EnableUpdateExternal(typeof(System.Numerics.Vector2), typeof(System.Numerics.Vector2))]
+public partial class MyVectorCopier
+{
+    
+}
+
+
+// MyVectorCopier.g.cs -- generated code
+using System;
+
+namespace Test;
+
+#nullable enable
+#pragma warning disable CS0109  // the member does not hide an inherited member.
+
+partial class MyVectorCopier
+{
+    /// <summary>
+    /// Transforms the X value before assigning the value to the target.
+    /// </summary>
+    partial void UpdateExternalTransform_X(ref float value);
+
+    /// <summary>
+    /// Transforms the Y value before assigning the value to the target.
+    /// </summary>
+    partial void UpdateExternalTransform_Y(ref float value);
+
+    /// <summary>
+    /// Method to run before the UpdateExternal method begins copying values.
+    /// </summary>
+    partial void BeforeUpdateExternal(System.Numerics.Vector2 source, ref System.Numerics.Vector2 target, ref int changeCount);
+
+    /// <summary>
+    /// Method to run after the UpdateExternal method finishes copying values.
+    /// </summary>
+    partial void AfterUpdateExternal(System.Numerics.Vector2 source, ref System.Numerics.Vector2 target, ref int changeCount);
+
+    /// <summary>
+    /// Updates properties from the source object to the target object and returns the number of changes.
+    /// </summary>
+    public new int UpdateExternal(System.Numerics.Vector2 source, ref System.Numerics.Vector2 target)
+    {
+        if (ReferenceEquals(null, source)) throw new ArgumentNullException();
+        if (ReferenceEquals(null, target)) throw new ArgumentNullException();
+        if (ReferenceEquals(target, source)) return 0;
+        var changeCount = 0;
+        BeforeUpdateExternal(source, ref target, ref changeCount);
+        var target_X = target.X;
+        var source_X = source.X;
+        UpdateExternalTransform_X(ref source_X);
+        if (!target_X.Equals(source_X)) {
+            target.X = source_X;
+            changeCount++;
+        }
+        var target_Y = target.Y;
+        var source_Y = source.Y;
+        UpdateExternalTransform_Y(ref source_Y);
+        if (!target_Y.Equals(source_Y)) {
+            target.Y = source_Y;
+            changeCount++;
+        }
+        AfterUpdateExternal(source, ref target, ref changeCount);
+        return changeCount;
+    }
+}
+```
+
+The `UpdateTargetTransform_` methods are not static here.  Since the partial class is not the one being modified,
+we allow it to use instance data during transformations.  You may also notice that the code correctly identifies the
+target type as a struct and utilizes the `ref` keyword on the `BeforeUpdateTarget`, `AfterUpdateTarget`, and
+`UpdateTarget` method parameters.  Unlike previous examples, the `BeforeUpdateTarget`, `AfterUpdateTarget`, and
+`UpdateTarget` methods all take both the source and target objects.  The source will never be marked with `ref`. 
 
 
 ## General Notes

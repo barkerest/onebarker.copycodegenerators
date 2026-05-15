@@ -1,4 +1,5 @@
 ﻿using System.Linq;
+using JetBrains.Annotations;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -7,14 +8,14 @@ namespace OneBarker.CopyCodeGenerators
     public class CopyClassDeclarationSet
     {
         public CopyClassDeclarationSet(
-            TypeDeclarationSyntax target,
-            INamedTypeSymbol[]    sourceNames,
-            bool                  attributeFound
+            TypeDeclarationSyntax                                target,
+            (INamedTypeSymbol source, INamedTypeSymbol target)[] objectNames,
+            bool                                                 attributeFound
         )
         {
-            TargetObject      = target;
-            SourceObjectNames = sourceNames;
-            AttributeFound    = attributeFound;
+            TargetObject   = target;
+            ObjectNames    = objectNames;
+            AttributeFound = attributeFound;
             TargetObjectType = TargetObject is StructDeclarationSyntax
                                    ? "struct"
                                    : TargetObject is RecordDeclarationSyntax r
@@ -31,10 +32,10 @@ namespace OneBarker.CopyCodeGenerators
                                      .ToArray();
         }
 
-        public readonly TypeDeclarationSyntax TargetObject;
-        public readonly INamedTypeSymbol[]    SourceObjectNames;
-        public readonly bool                  AttributeFound;
-        public readonly string                TargetObjectType;
-        public readonly string[]              TargetObjectParameters;
+        public readonly TypeDeclarationSyntax                                TargetObject;
+        public readonly (INamedTypeSymbol source, INamedTypeSymbol target)[] ObjectNames;
+        public readonly bool                                                 AttributeFound;
+        public readonly string                                               TargetObjectType;
+        public readonly string[]                                             TargetObjectParameters;
     }
 }
