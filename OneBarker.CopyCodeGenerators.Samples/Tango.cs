@@ -3,7 +3,7 @@ using Generators;
 
 namespace OneBarker.CopyCodeGenerators.Samples;
 
-[EnableUpdateExternal(typeof(System.Numerics.Vector2), typeof(System.Numerics.Vector3))]
+[EnableUpdateExternal(typeof(Vector2), typeof(Vector3))]
 public partial class Tango
 {
     // NOT SUPPORTED!
@@ -11,7 +11,7 @@ public partial class Tango
         => 123.4f;
 
     // CONSIDER SUPPORTING!
-    float Get_Z(System.Numerics.Vector2 source)
+    float Get_Z(Vector2 source)
         => source.X + source.Y;
 
     // CURRENT SOLUTION
