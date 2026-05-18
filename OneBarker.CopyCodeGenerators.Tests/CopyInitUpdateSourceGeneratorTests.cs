@@ -398,7 +398,7 @@ public partial class CopyInitUpdateSourceGeneratorTests
 
         // Run generators and retrieve all results.
         var runResult = driver.RunGenerators(compilation).GetRunResult();
-
+        
         // All generated files can be found in 'RunResults.GeneratedTrees'.
         foreach (var (name, source) in data.UpdateExternalResults)
         {

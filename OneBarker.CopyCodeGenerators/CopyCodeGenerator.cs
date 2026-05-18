@@ -78,7 +78,11 @@ namespace OneBarker.CopyCodeGenerators
             bool                 includeNonPublic,
             bool                 includeReadOnly,
             bool                 includeInitOnly,
-            HashSet<ISymbol>     handled = null
+            HashSet<ISymbol>     handled                  = null,
+            bool                 includeFields            = true,
+            bool                 includeProps             = true,
+            bool                 includeMethods           = true,
+            INamedTypeSymbol     includeSingleParamMethod = null
         )
         {
             if (handled is null) handled = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
@@ -87,28 +91,47 @@ namespace OneBarker.CopyCodeGenerators
             {
                 if (!handled.Add(symbol)) return;
 
-                var symProps = symbol.GetMembers()
-                                     .OfType<IPropertySymbol>()
-                                     .Where(x => !x.IsWriteOnly &&
-                                                 x.Parameters.IsEmpty
-                                     );
-                var symFields = symbol.GetMembers()
-                                      .OfType<IFieldSymbol>()
-                                      .Where(x => x.IsConst != true &&
-                                                  ValidNamePattern.IsMatch(x.Name)
-                                      );
-                var symGets = symbol.GetMembers()
-                                    .OfType<IMethodSymbol>()
-                                    .Where(x => !x.IsStatic                            &&
-                                                !x.ReturnsVoid                         &&
-                                                !x.IsGenericMethod                     &&
-                                                !x.IsPartialDefinition                 &&
-                                                !x.IsAbstract                          &&
-                                                x.Arity      == 0                      &&
-                                                x.MethodKind != MethodKind.PropertyGet &&
-                                                x.Parameters.IsEmpty                   &&
-                                                x.Name.StartsWith("Get_", StringComparison.OrdinalIgnoreCase)
-                                    );
+                var symProps = includeProps
+                                   ? symbol.GetMembers()
+                                           .OfType<IPropertySymbol>()
+                                           .Where(x => !x.IsWriteOnly &&
+                                                       x.Parameters.IsEmpty
+                                           )
+                                   : Array.Empty<IPropertySymbol>();
+                var symFields = includeFields
+                                    ? symbol.GetMembers()
+                                            .OfType<IFieldSymbol>()
+                                            .Where(x => x.IsConst != true &&
+                                                        ValidNamePattern.IsMatch(x.Name)
+                                            )
+                                    : Array.Empty<IFieldSymbol>();
+                var symGets = includeMethods
+                                  ? symbol.GetMembers()
+                                          .OfType<IMethodSymbol>()
+                                          .Where(x => !x.IsStatic                            &&
+                                                      !x.ReturnsVoid                         &&
+                                                      !x.IsGenericMethod                     &&
+                                                      !x.IsPartialDefinition                 &&
+                                                      !x.IsAbstract                          &&
+                                                      x.Arity      == 0                      &&
+                                                      x.MethodKind != MethodKind.PropertyGet &&
+                                                      (
+                                                          (
+                                                              includeSingleParamMethod == null &&
+                                                              x.Parameters.IsEmpty
+                                                          ) ||
+                                                          (
+                                                              includeSingleParamMethod != null &&
+                                                              x.Parameters.Length      == 1    &&
+                                                              SymbolEqualityComparer.Default.Equals(
+                                                                  x.Parameters[0].Type,
+                                                                  includeSingleParamMethod
+                                                              )
+                                                          )
+                                                      ) &&
+                                                      x.Name.StartsWith("Get_", StringComparison.OrdinalIgnoreCase)
+                                          )
+                                  : Array.Empty<IMethodSymbol>();
 
                 if (!includeNonPublic)
                 {
@@ -174,7 +197,11 @@ namespace OneBarker.CopyCodeGenerators
                         includeNonPublic,
                         includeReadOnly,
                         includeInitOnly,
-                        handled
+                        handled,
+                        includeFields,
+                        includeProps,
+                        includeMethods,
+                        includeSingleParamMethod
                     );
                 }
 
@@ -186,7 +213,11 @@ namespace OneBarker.CopyCodeGenerators
             IEnumerable<INamedTypeSymbol> symbols,
             bool                          includeNonPublic,
             bool                          includeReadOnly, // return all properties.
-            bool                          includeInitOnly // include init-only if not including read-only.
+            bool                          includeInitOnly, // include init-only if not including read-only.
+            INamedTypeSymbol              includeSingleParamMethod = null,
+            bool                          includeFields            = true,
+            bool                          includeProps             = true,
+            bool                          includeMethods           = true
         )
         {
             var ret = new HashSet<ValueSymbol>();
@@ -194,7 +225,18 @@ namespace OneBarker.CopyCodeGenerators
             // handle partial definitions as separate symbols.
             foreach (var symbol in symbols)
             {
-                AddValues(symbol, ret, includeNonPublic, includeReadOnly, includeInitOnly);
+                AddValues(
+                    symbol,
+                    ret,
+                    includeNonPublic,
+                    includeReadOnly,
+                    includeInitOnly,
+                    null,
+                    includeFields,
+                    includeProps,
+                    includeMethods,
+                    includeSingleParamMethod
+                );
             }
 
             return ret;
@@ -204,23 +246,38 @@ namespace OneBarker.CopyCodeGenerators
             INamedTypeSymbol symbol,
             bool             includeNonPublic,
             bool             includeReadOnly, // return all properties and get_ methods.
-            bool             includeInitOnly // include init-only if not including read-only.
+            bool             includeInitOnly, // include init-only if not including read-only.
+            INamedTypeSymbol includeSingleParamMethod = null,
+            bool             includeFields            = true,
+            bool             includeProps             = true,
+            bool             includeMethods           = true
         )
         {
             var ret = new HashSet<ValueSymbol>();
-            AddValues(symbol, ret, includeNonPublic, includeReadOnly, includeInitOnly);
+            AddValues(
+                symbol,
+                ret,
+                includeNonPublic,
+                includeReadOnly,
+                includeInitOnly,
+                null,
+                includeFields,
+                includeProps,
+                includeMethods,
+                includeSingleParamMethod
+            );
             return ret;
         }
 
         private static string GetNullDefaultFromCandidates(
-            ITypeSymbol unknown,
+            ITypeSymbol type,
             ITypeSymbol container,
             ISymbol[]   candidateMembers,
             string      targetName
         )
         {
             if (candidateMembers.Length < 1) return null;
-            var isContainerType = container.Equals(unknown, SymbolEqualityComparer.Default);
+            var isContainerType = container.Equals(type, SymbolEqualityComparer.Default);
             var methodNames = isContainerType
                                   ? new string[]
                                     {
@@ -229,10 +286,10 @@ namespace OneBarker.CopyCodeGenerators
                                     }
                                   : new string[]
                                     {
-                                        $"Default{unknown?.Name}For{targetName}",
-                                        $"Empty{unknown?.Name}For{targetName}",
-                                        $"Default{unknown?.Name}",
-                                        $"Empty{unknown?.Name}",
+                                        $"Default{type?.Name}For{targetName}",
+                                        $"Empty{type?.Name}For{targetName}",
+                                        $"Default{type?.Name}",
+                                        $"Empty{type?.Name}",
                                     };
 
             var propertyNames = isContainerType
@@ -245,10 +302,10 @@ namespace OneBarker.CopyCodeGenerators
                                       }
                                     : new string[]
                                       {
-                                          $"Default{unknown?.Name}For{targetName}",
-                                          $"Empty{unknown?.Name}For{targetName}",
-                                          $"Default{unknown?.Name}",
-                                          $"Empty{unknown?.Name}",
+                                          $"Default{type?.Name}For{targetName}",
+                                          $"Empty{type?.Name}For{targetName}",
+                                          $"Default{type?.Name}",
+                                          $"Empty{type?.Name}",
                                       };
 
             var fieldNames = isContainerType
@@ -265,21 +322,21 @@ namespace OneBarker.CopyCodeGenerators
                                    }
                                  : new string[]
                                    {
-                                       $"Default{unknown?.Name}For{targetName}",
-                                       $"Empty{unknown?.Name}For{targetName}",
-                                       $"Default{unknown?.Name}",
-                                       $"Empty{unknown?.Name}",
-                                       $"_default{unknown?.Name}For{targetName}",
-                                       $"_empty{unknown?.Name}For{targetName}",
-                                       $"_default{unknown?.Name}",
-                                       $"_empty{unknown?.Name}",
+                                       $"Default{type?.Name}For{targetName}",
+                                       $"Empty{type?.Name}For{targetName}",
+                                       $"Default{type?.Name}",
+                                       $"Empty{type?.Name}",
+                                       $"_default{type?.Name}For{targetName}",
+                                       $"_empty{type?.Name}For{targetName}",
+                                       $"_default{type?.Name}",
+                                       $"_empty{type?.Name}",
                                    };
 
             var candidateMethods = candidateMembers
                                    .OfType<IMethodSymbol>()
                                    .Where(x => !x.ReturnsVoid
                                                && x.ReturnType.Equals(
-                                                   unknown,
+                                                   type,
                                                    SymbolEqualityComparer.Default
                                                )
                                                && x.Parameters.IsEmpty
@@ -298,7 +355,7 @@ namespace OneBarker.CopyCodeGenerators
 
             var candidateProperties = candidateMembers
                                       .OfType<IPropertySymbol>()
-                                      .Where(x => x.Type.Equals(unknown, SymbolEqualityComparer.Default)
+                                      .Where(x => x.Type.Equals(type, SymbolEqualityComparer.Default)
                                       )
                                       .ToArray();
 
@@ -316,7 +373,7 @@ namespace OneBarker.CopyCodeGenerators
 
             var candidateFields = candidateMembers
                                   .OfType<IFieldSymbol>()
-                                  .Where(x => x.Type.Equals(unknown, SymbolEqualityComparer.Default)
+                                  .Where(x => x.Type.Equals(type, SymbolEqualityComparer.Default)
                                   )
                                   .ToArray();
 
@@ -336,24 +393,24 @@ namespace OneBarker.CopyCodeGenerators
         }
 
         private static string GetNullDefault(
-            ITypeSymbol      unknown,
+            ITypeSymbol      type,
             INamedTypeSymbol containingClass,
             string           targetName
         )
         {
             return GetNullDefaultFromCandidates(
-                       unknown,
+                       type,
                        containingClass,
                        containingClass.GetMembers().Where(x => x.IsStatic).ToArray(),
                        targetName
                    )
                    ?? GetNullDefaultFromCandidates(
-                       unknown,
-                       unknown,
-                       unknown.GetMembers()
-                              .Where(x => x.IsStatic && x.DeclaredAccessibility == Accessibility.Public
-                              )
-                              .ToArray(),
+                       type,
+                       type,
+                       type.GetMembers()
+                           .Where(x => x.IsStatic && x.DeclaredAccessibility == Accessibility.Public
+                           )
+                           .ToArray(),
                        targetName
                    )
                    ?? "";
@@ -491,19 +548,28 @@ namespace OneBarker.CopyCodeGenerators
                         sourceClassName = $"{sourceSym.ContainingNamespace}.{sourceSym.Name}";
                         targetClassName = $"{targetSym.ContainingNamespace}.{targetSym.Name}";
 
-                        // we can only touch public properties and fields.
-                        // source members can be read-only.
-                        var sourceMembers = GetValues(sourceSym, false, true, true);
+                        // We will look at the source type and the host type.
+                        // Source members can be read-only.
+                        // We can only touch public properties and fields in the source type.
+                        // We can use non-public methods in the host type that take a single parameter of the source type.
+                        // This allows us to define mapping where needed.
+                        var sourceMembers = GetValues(sourceSym, false, true, true)
+                                            .Concat(GetValues(classSymbol, true, true, true, sourceSym, false, false))
+                                            .ToArray();
+
                         // target members must be writable.
                         targetMembers = GetValues(targetSym, false, false, false);
 
                         members = targetMembers
                                   .Where(x => x.IsField || x.IsProperty)
-                                  // lowest to highest, prefer fields over properties.
+                                  // Distinct by name/alternate name
+                                  .Distinct(ValueSymbol.Comparer)
+                                  // Parameterized methods are the most preferred.
+                                  // Then non-parameterized methods.
+                                  // Then properties.
+                                  // Then fields.
                                   .OrderBy(x => x.Preference)
-                                  // distinct by name/alternate name
-                                  .Distinct()
-                                  // where we can find a match in the other object.
+                                  // Where we can find a match in the other object.
                                   .Where(x => x.SelectOther(sourceMembers))
                                   .ToArray();
                     }
@@ -524,10 +590,10 @@ namespace OneBarker.CopyCodeGenerators
                             // and we'll use the members from the "source" since that is where we are copying to.
                             members = sourceMembers
                                       .Where(x => x.IsField || x.IsProperty)
+                                      // distinct by name/alternate name
+                                      .Distinct(ValueSymbol.Comparer)
                                       // lowest to highest, prefer fields over properties.
                                       .OrderBy(x => x.Preference)
-                                      // distinct by name/alternate name
-                                      .Distinct()
                                       // where we can find a match in the other object.
                                       .Where(x => x.SelectOther(targetMembers))
                                       .ToArray();
@@ -540,10 +606,10 @@ namespace OneBarker.CopyCodeGenerators
                             // and we'll use the members from the "target" since that is where we are copying to.
                             members = targetMembers
                                       .Where(x => x.IsField || x.IsProperty)
+                                      // distinct by name/alternate name
+                                      .Distinct(ValueSymbol.Comparer)
                                       // lowest to highest, prefer fields over properties.
                                       .OrderBy(x => x.Preference)
-                                      // distinct by name/alternate name
-                                      .Distinct()
                                       // where we can find a match in the other object.
                                       .Where(x => x.SelectOther(sourceMembers))
                                       .ToArray();
@@ -870,6 +936,7 @@ namespace OneBarker.CopyCodeGenerators
                         // passthroughs will only be used against a "source" parameter.
                         if (useInitPassthroughs)
                         {
+                            var getSource = sourceProp.ToGetString("source");
                             transforms[$"~{targetProp.AlternateName}_{sourceClassName}"] = $@"
     /// <summary>
     /// Transforms the {targetProp.AlternateName} value and returns the new value.
@@ -877,7 +944,7 @@ namespace OneBarker.CopyCodeGenerators
     static {targetProp.Type} PassthroughTransform_{targetProp.AlternateName}({sourceClassName} source)
     {{
         if (ReferenceEquals(null, source)) throw new ArgumentNullException();
-        var value = source.{p};
+        var value = {getSource};
         {_extraMethodBaseName}Transform_{targetProp.AlternateName}(ref value);
         return value;
     }}";
@@ -885,211 +952,35 @@ namespace OneBarker.CopyCodeGenerators
 
                         // property setting for parameterized properties is handled via the passthroughs only.
                         if (useInitPassthroughs && recParamList.Contains(targetProp.AlternateName)) continue;
+                        
+                        var propParams = new PropertyParameters(
+                            classSymbol,
+                            targetProp,
+                            sourceProp,
+                            _extraMethodBaseName,
+                            _sourceName,
+                            _targetName,
+                            GetNullDefault
+                        );
 
-                        var isTargetNotNullable = targetProp.Type.NullableAnnotation != NullableAnnotation.Annotated;
+                        var fmt =
+                            (_returnType == MethodReturnType.Count)
+                                ? targetProp.Type.IsValueType
+                                      ? (propParams.IsSourceNullableValueType && propParams.IsTargetNonNullable)
+                                            ? propParams.SetNonNullableValueTypeWithCount
+                                            : propParams.SetValueTypeWithCount
+                                      : propParams.IsTargetNonNullable
+                                          ? propParams.SetNonNullableReferenceTypeWithCount
+                                          : propParams.SetReferenceTypeWithCount
+                                : propParams.IsTargetNonNullable &&
+                                  (
+                                      !targetProp.Type.IsValueType ||
+                                      propParams.IsSourceNullableValueType
+                                  )
+                                    ? propParams.SetNonNullableValue
+                                    : propParams.SetValue;
 
-                        var isSourceNullableValueType = sourceProp.Type.IsValueType &&
-                                                        sourceProp.Type.NullableAnnotation ==
-                                                        NullableAnnotation.Annotated;
-
-                        var sourceValue = $"{_sourceName}_{targetProp.AlternateName}";
-                        var targetValue = $"{_targetName}_{targetProp.AlternateName}";
-                        if (_returnType == MethodReturnType.Count)
-                        {
-                            if (targetProp.Type.IsValueType)
-                            {
-                                if (isSourceNullableValueType && isTargetNotNullable)
-                                {
-                                    var nullDefault = GetNullDefault(
-                                        targetProp.Type,
-                                        classSymbol,
-                                        targetProp.Name
-                                    );
-                                    if (string.IsNullOrEmpty(nullDefault))
-                                        nullDefault = $"default({targetProp.Type.Name})";
-
-                                    // nullable value types require a check.
-                                    body.AppendFormat(
-                                        @"
-        var {2} = {5}.{7};
-        var {1} = {4}.{6};
-        if (!{1}.HasValue) {1} = {8};
-        {3}Transform_{0}(ref {1});
-        if (!{1}.HasValue) {1} = {8};
-        if (!{2}.Equals({1})) {{
-            {5}.{7} = {1};
-            changeCount++;
-        }}",
-                                        targetProp.AlternateName,
-                                        sourceValue,
-                                        targetValue,
-                                        _extraMethodBaseName,
-                                        _sourceName,
-                                        _targetName,
-                                        sourceProp,
-                                        targetProp,
-                                        nullDefault
-                                    );
-                                }
-                                else
-                                {
-                                    // non-nullable value types are easy.
-                                    body.AppendFormat(
-                                        @"
-        var {2} = {5}.{7};
-        var {1} = {4}.{6};
-        {3}Transform_{0}(ref {1});
-        if (!{2}.Equals({1})) {{
-            {5}.{7} = {1};
-            changeCount++;
-        }}",
-                                        targetProp.AlternateName,
-                                        sourceValue,
-                                        targetValue,
-                                        _extraMethodBaseName,
-                                        _sourceName,
-                                        _targetName,
-                                        sourceProp,
-                                        targetProp
-                                    );
-                                }
-                            }
-                            else if (isTargetNotNullable)
-                            {
-                                var nullDefault = GetNullDefault(
-                                    targetProp.Type,
-                                    classSymbol,
-                                    targetProp.Name
-                                );
-                                var ifNull = string.IsNullOrEmpty(nullDefault)
-                                                 ? $@"throw new InvalidOperationException(""The source property {sourceProp.Name} has a value of null and the type {targetProp.Type.Name} does not have a default/empty value."")"
-                                                 : $"{sourceValue} = {nullDefault}";
-
-                                // reference types can be nullable or non-nullable.
-                                // non-nullable should be treated (mostly) like value types.
-                                // we'll just throw in a null check before calling Equals()
-                                body.AppendFormat(
-                                    @"
-        var {2} = {5}.{7};
-        var {1} = {4}.{6};
-        if (ReferenceEquals(null, {1})) {8};
-        {3}Transform_{0}(ref {1});
-        if (ReferenceEquals(null, {1})) {8};
-        if (!ReferenceEquals({2}, {1}) && (ReferenceEquals(null, {2}) || !{2}.Equals({1}))) {{
-            {5}.{7} = {1};
-            changeCount++;
-        }}",
-                                    targetProp.AlternateName,
-                                    sourceValue,
-                                    targetValue,
-                                    _extraMethodBaseName,
-                                    _sourceName,
-                                    _targetName,
-                                    sourceProp,
-                                    targetProp,
-                                    ifNull
-                                );
-                            }
-                            else
-                            {
-                                // nullable reference types don't need the null check on the source before processing.
-                                body.AppendFormat(
-                                    @"
-        var {2} = {5}.{7};
-        var {1} = {4}.{6};
-        {3}Transform_{0}(ref {1});
-        if (!ReferenceEquals({2}, {1}) && (ReferenceEquals(null, {2}) || (!ReferenceEquals(null, {2}) && !{2}.Equals({1})))) {{
-            {5}.{7} = {1};
-            changeCount++;
-        }}",
-                                    targetProp.AlternateName,
-                                    sourceValue,
-                                    targetValue,
-                                    _extraMethodBaseName,
-                                    _sourceName,
-                                    _targetName,
-                                    sourceProp,
-                                    targetProp
-                                );
-                            }
-                        }
-                        else
-                        {
-                            if (isSourceNullableValueType && isTargetNotNullable)
-                            {
-                                var nullDefault = GetNullDefault(
-                                    targetProp.Type,
-                                    classSymbol,
-                                    targetProp.Name
-                                );
-                                if (string.IsNullOrEmpty(nullDefault)) nullDefault = $"default({targetProp.Type.Name})";
-                                body.AppendFormat(
-                                    @"
-        var {1} = {4}.{6};
-        if (ReferenceEquals(null, {1})) {1} = {8};
-        {3}Transform_{0}(ref {1});
-        if (ReferenceEquals(null, {1})) {1} = {8};
-        {5}.{7} = {1};",
-                                    targetProp.AlternateName,
-                                    sourceValue,
-                                    targetValue,
-                                    _extraMethodBaseName,
-                                    _sourceName,
-                                    _targetName,
-                                    sourceProp,
-                                    targetProp,
-                                    nullDefault
-                                );
-                            }
-                            else if (!targetProp.Type.IsValueType && isTargetNotNullable)
-                            {
-                                var nullDefault = GetNullDefault(
-                                    targetProp.Type,
-                                    classSymbol,
-                                    targetProp.Name
-                                );
-                                var ifNull = string.IsNullOrEmpty(nullDefault)
-                                                 ? $@"throw new InvalidOperationException(""The source property {sourceProp.Name} has a value of null and the type {targetProp.Type.Name} does not have a default/empty value."")"
-                                                 : $"{sourceValue} = {nullDefault}";
-
-                                // don't check for changes, just copy the value over, but check for nulls.
-                                body.AppendFormat(
-                                    @"
-        var {1} = {4}.{6};
-        if (ReferenceEquals(null, {1})) {8};
-        {3}Transform_{0}(ref {1});
-        if (ReferenceEquals(null, {1})) {8};
-        {5}.{7} = {1};",
-                                    targetProp.AlternateName,
-                                    sourceValue,
-                                    targetValue,
-                                    _extraMethodBaseName,
-                                    _sourceName,
-                                    _targetName,
-                                    sourceProp,
-                                    targetProp,
-                                    ifNull
-                                );
-                            }
-                            else
-                            {
-                                // don't check for changes, just copy the value over.
-                                body.AppendFormat(
-                                    @"
-        var {1} = {4}.{6};
-        {3}Transform_{0}(ref {1});
-        {5}.{7} = {1};",
-                                    targetProp.AlternateName,
-                                    sourceValue,
-                                    targetValue,
-                                    _extraMethodBaseName,
-                                    _sourceName,
-                                    _targetName,
-                                    sourceProp,
-                                    targetProp
-                                );
-                            }
-                        }
+                        body.AppendFormat(fmt.Format, fmt.GetArguments());
                     }
 
                     if (_addAfterMethod)

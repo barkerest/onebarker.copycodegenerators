@@ -15,9 +15,9 @@ partial class November2
     static partial void UpdateFromTransform_NonNullableString(ref string value);
 
     /// <summary>
-    /// Transforms the nullableString value before assigning the value to the target.
+    /// Transforms the NullableString value before assigning the value to the target.
     /// </summary>
-    static partial void UpdateFromTransform_nullableString(ref string? value);
+    static partial void UpdateFromTransform_NullableString(ref string? value);
 
     /// <summary>
     /// Transforms the Value2 value before assigning the value to the target.
@@ -52,11 +52,11 @@ partial class November2
             this.NonNullableString = source_NonNullableString;
             changeCount++;
         }
-        var this_nullableString = this._nullableString;
-        var source_nullableString = source.NullableString;
-        UpdateFromTransform_nullableString(ref source_nullableString);
-        if (!ReferenceEquals(this_nullableString, source_nullableString) && (ReferenceEquals(null, this_nullableString) || (!ReferenceEquals(null, this_nullableString) && !this_nullableString.Equals(source_nullableString)))) {
-            this._nullableString = source_nullableString;
+        var this_NullableString = this._nullableString;
+        var source_NullableString = source.NullableString;
+        UpdateFromTransform_NullableString(ref source_NullableString);
+        if (!ReferenceEquals(this_NullableString, source_NullableString) && (ReferenceEquals(null, this_NullableString) || (!ReferenceEquals(null, this_NullableString) && !this_NullableString.Equals(source_NullableString)))) {
+            this._nullableString = source_NullableString;
             changeCount++;
         }
         var this_Value2 = this.Value2;

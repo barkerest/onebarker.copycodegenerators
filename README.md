@@ -21,6 +21,24 @@ You can also use the `[SkipOnCopy]` attribute to mark properties/fields to be ig
 The output code examples may not match the current output.  As more features are added, the output code
 changes accordingly.
 
+## Version 1.3 updates
+
+ * Added support for value providers in the copier class when using `[EnableUpdateExternal]`.
+```csharp
+[EnableUpdateExternal(typeof(System.Numerics.Vector2), typeof(System.Numerics.Vector3))]
+partial class VectorCopier
+{
+    // This method will be called to get the value for the Z property in the target.
+    float Get_Z(System.Numerics.Vector2 source)
+    {
+        return source.X + source.Y;
+    }
+}
+```
+
+ * Refactored the generators for the value setting code.
+ * Located and fixed a few logical bugs that had managed not to cause trouble yet.
+
 
 ## Version 1.2 updates
 

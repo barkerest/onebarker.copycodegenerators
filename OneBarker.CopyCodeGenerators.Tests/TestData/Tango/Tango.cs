@@ -1,7 +1,17 @@
-﻿using System.Numerics;
+using System.Numerics;
 using Generators;
 
 namespace OneBarker.CopyCodeGenerators.Samples;
+
+/*
+ * Tango gives us two more tests for those situations where your types aren't mapped 1:1.
+ * 
+ * Tango1 demonstrates that the Get_ method used by other copy methods is ignored for UpdateExternal.
+ * Only X & Y are updated by Tango1.
+ * 
+ * Tango2 demonstrates the supported Get_ method for UpdateExternal.
+ * X, Y, & Z are updated by Tango2.
+ */
 
 [EnableUpdateExternal(typeof(Vector2), typeof(Vector3))]
 public partial class Tango1
