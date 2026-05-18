@@ -38,6 +38,14 @@ partial class VectorCopier
 
  * Refactored the generators for the value setting code.
  * Located and fixed a few logical bugs that had managed not to cause trouble yet.
+ * Standardized preferences between getters and setters.
+   * Preference when getting a value:
+     * Get_ method
+     * Property
+     * Field
+   * Preference when setting a value:
+     * Property
+     * Field
 
 
 ## Version 1.2 updates
@@ -202,8 +210,12 @@ or `Get_` method is found.  To eliminate a field, property, or `Get_` method fro
 attribute to mark the unwanted item.
 
 This is only true for retrieving values.  Setting values can only be done to properties or fields.  If both a property
-and a field match on the name (eg - `_value` and `Value`), the field will be preferred over the property for setting.
-To avoid this behavior, use the `SkipOnCopy` attribute on the field to force it to use the property.
+and a field match on the name (eg - `_value` and `Value`), the property will be preferred over the field for setting.
+To avoid this behavior, use the `SkipOnCopy` attribute on the property to force it to use the field.
+
+__WARNING__: Preference for setting changed with v1.3 and wasn't documented with the package.
+Before v1.3 setting preferred fields over properties, which did not fit with the maximum customization
+idea of the library.
 
 
 ## EnableInitFrom
