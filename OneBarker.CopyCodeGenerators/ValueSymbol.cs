@@ -57,6 +57,9 @@ namespace OneBarker.CopyCodeGenerators
 
         [NotNull]
         public string AlternateName { get; }
+        
+        [NotNull]
+        public IReadOnlyCollection<AttributeData> Attributes { get; }
 
         public bool IsField    { get; }
         public bool IsProperty { get; }
@@ -103,6 +106,7 @@ namespace OneBarker.CopyCodeGenerators
             CanWrite      = symbol.SetMethod != null;
             IsInitOnly    = symbol.SetMethod?.IsInitOnly ?? false;
             Preference    = 2;
+            Attributes    = symbol.GetAttributes();
         }
 
         
@@ -112,11 +116,12 @@ namespace OneBarker.CopyCodeGenerators
             Type          = symbol.Type ?? throw new ArgumentException("Symbol type is null.", nameof(symbol));
             Name          = symbol.Name ?? throw new ArgumentException("Symbol name is null.", nameof(symbol));
             AlternateName = FixName(Name, "_");
-            IsField    = true;
-            CanRead    = true;
-            CanWrite   = !symbol.IsReadOnly;
-            IsInitOnly = symbol.IsReadOnly;
-            Preference = 3;
+            IsField       = true;
+            CanRead       = true;
+            CanWrite      = !symbol.IsReadOnly;
+            IsInitOnly    = symbol.IsReadOnly;
+            Preference    = 3;
+            Attributes    = symbol.GetAttributes();
         }
 
         public ValueSymbol(IMethodSymbol symbol)
@@ -142,6 +147,8 @@ namespace OneBarker.CopyCodeGenerators
             // Default gets the lowest preference.
             Preference = Name.StartsWith("Default_", StringComparison.OrdinalIgnoreCase) ? 5 : 1;
 
+            Attributes = symbol.GetAttributes();
+            
             // a parameterized method is more preferred.
             TakesSourceParam = symbol.Parameters.Length == 1;
             if (TakesSourceParam) Preference -= 1;

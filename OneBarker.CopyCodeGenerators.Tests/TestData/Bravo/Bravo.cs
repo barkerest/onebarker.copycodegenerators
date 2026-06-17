@@ -15,6 +15,11 @@ namespace TestNamespace;
  * meant to make the null-checking more robust.  The code will try to find a default/empty value
  * in the value type (eg - String.Empty), but if we define a static method that returns the
  * target type, then that should be used instead.
+ *
+ * Finally, Bravo2 overrides two properties from Bravo.  The "IgnoredProperty" should still be
+ * ignored even though the attribute was not added in again.  The "NullableString" property
+ * should also be ignored for Bravo2.  And the default string value from Bravo should no
+ * longer be used in Bravo2.
  */
 [EnableInitFrom(typeof(Bravo))]
 [EnableCopyFrom(typeof(Bravo))]
@@ -24,10 +29,24 @@ public partial class Bravo
     public Bravo() { }
 
     public string  NonNullableString { get; set; } = "";
-    public string? NullableString    { get; set; }
+    public virtual string? NullableString    { get; set; }
 
     [SkipOnCopy]
-    public int IgnoredProperty { get; set; }
+    public virtual int IgnoredProperty { get; set; }
 
     private static string DefaultString() => "~something~";
+}
+
+[EnableInitFrom(typeof(Bravo))]
+[EnableCopyFrom(typeof(Bravo))]
+[EnableUpdateFrom(typeof(Bravo))]
+
+public partial class Bravo2 : Bravo
+{
+    // ensure this is now ignored.
+    [SkipOnCopy]
+    public override string? NullableString { get; set; }
+
+    // ensure this is still ignored.
+    public override int IgnoredProperty { get; set; }
 }

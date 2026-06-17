@@ -89,8 +89,9 @@ namespace OneBarker.CopyCodeGenerators
 
             while (symbol != null)
             {
-                if (!handled.Add(symbol)) return;
+                if (!handled.Add(symbol)) break;
 
+                
                 var symProps = includeProps
                                    ? symbol.GetMembers()
                                            .OfType<IPropertySymbol>()
@@ -132,7 +133,7 @@ namespace OneBarker.CopyCodeGenerators
                                                       x.Name.StartsWith("Get_", StringComparison.OrdinalIgnoreCase)
                                           )
                                   : Array.Empty<IMethodSymbol>();
-
+                
                 if (!includeNonPublic)
                 {
                     symProps = symProps.Where(x => x.GetMethod                       != null &&
@@ -160,20 +161,7 @@ namespace OneBarker.CopyCodeGenerators
                 {
                     symProps = symProps.Where(x => x.SetMethod != null && x.SetMethod.IsInitOnly != true);
                 }
-
-                symProps = symProps.Where(x =>
-                    !x.GetAttributes()
-                      .Any(y => SkipPropertySourceGenerator.IsAttribute(y.AttributeClass))
-                );
-                symFields = symFields.Where(x =>
-                    !x.GetAttributes()
-                      .Any(y => SkipPropertySourceGenerator.IsAttribute(y.AttributeClass))
-                );
-                symGets = symGets.Where(x =>
-                    !x.GetAttributes()
-                      .Any(y => SkipPropertySourceGenerator.IsAttribute(y.AttributeClass))
-                );
-
+                
                 foreach (var prop in symProps)
                 {
                     valueSymbols.Add(new ValueSymbol(prop));
@@ -207,6 +195,10 @@ namespace OneBarker.CopyCodeGenerators
 
                 symbol = symbol.BaseType;
             }
+
+            valueSymbols.RemoveWhere(x
+                => x.Attributes.Any(y => SkipPropertySourceGenerator.IsAttribute(y.AttributeClass))
+            );
         }
 
         private static IReadOnlyCollection<ValueSymbol> GetValues(

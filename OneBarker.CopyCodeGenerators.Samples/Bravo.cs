@@ -24,10 +24,25 @@ public partial class Bravo
     public Bravo() { }
 
     public string  NonNullableString { get; set; } = "";
-    public string? NullableString    { get; set; }
+    
+    public virtual string? NullableString    { get; set; }
 
     [SkipOnCopy]
-    public int IgnoredProperty { get; set; }
+    public virtual int IgnoredProperty { get; set; }
 
     private static string DefaultString() => "~something~";
+}
+
+[EnableInitFrom(typeof(Bravo))]
+[EnableCopyFrom(typeof(Bravo))]
+[EnableUpdateFrom(typeof(Bravo))]
+
+public partial class Bravo2 : Bravo
+{
+    // ensure this is now ignored.
+    [SkipOnCopy]
+    public override string? NullableString { get; set; }
+
+    // ensure this is still ignored.
+    public override int IgnoredProperty { get; set; }
 }
