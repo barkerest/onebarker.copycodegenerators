@@ -33,11 +33,19 @@ public partial class Bravo
     private static string DefaultString() => "~something~";
 }
 
+// A bug was found where having an interface on the inherited type causes the
+// premature removal of skipped properties.
+// In the bugged version, the [SkipOnCopy] is essentially ignored on the NullableString property below.
+public interface IBravo
+{
+    
+}
+
 [EnableInitFrom(typeof(Bravo))]
 [EnableCopyFrom(typeof(Bravo))]
 [EnableUpdateFrom(typeof(Bravo))]
 
-public partial class Bravo2 : Bravo
+public partial class Bravo2 : Bravo, IBravo
 {
     // ensure this is now ignored.
     [SkipOnCopy]

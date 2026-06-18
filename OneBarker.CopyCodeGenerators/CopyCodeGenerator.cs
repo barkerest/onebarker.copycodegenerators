@@ -82,7 +82,8 @@ namespace OneBarker.CopyCodeGenerators
             bool                 includeFields            = true,
             bool                 includeProps             = true,
             bool                 includeMethods           = true,
-            INamedTypeSymbol     includeSingleParamMethod = null
+            INamedTypeSymbol     includeSingleParamMethod = null,
+            bool removeSkipped = true
         )
         {
             if (handled is null) handled = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
@@ -189,16 +190,20 @@ namespace OneBarker.CopyCodeGenerators
                         includeFields,
                         includeProps,
                         includeMethods,
-                        includeSingleParamMethod
+                        includeSingleParamMethod,
+                        removeSkipped: false
                     );
                 }
 
                 symbol = symbol.BaseType;
             }
 
-            valueSymbols.RemoveWhere(x
-                => x.Attributes.Any(y => SkipPropertySourceGenerator.IsAttribute(y.AttributeClass))
-            );
+            if (removeSkipped)
+            {
+                valueSymbols.RemoveWhere(x
+                    => x.Attributes.Any(y => SkipPropertySourceGenerator.IsAttribute(y.AttributeClass))
+                );
+            }
         }
 
         private static IReadOnlyCollection<ValueSymbol> GetValues(
